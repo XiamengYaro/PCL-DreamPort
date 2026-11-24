@@ -35,7 +35,7 @@
                 <TextBlock FontSize="12"
                            Opacity="0.8"
                            TextWrapping="Wrap"
-                           Text="用于登录夏镇梦港站点账号及拉取服务端推送的 PCL 原生自定义主页（支持环境或本机自定义地址）。" />
+                           Text="用于通过浏览器授权登录夏镇梦港站点账号及拉取服务端推送的 PCL 原生自定义主页（支持环境或本机自定义地址）。" />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                     <TextBox Grid.Column="0"
                              IsEnabled="{Binding !IsBusy}"
@@ -55,95 +55,77 @@
                 CornerRadius="6"
                 Padding="18,14"
                 IsVisible="{Binding IsNotLoggedIn}">
-            <StackPanel Spacing="10">
+            <StackPanel Spacing="12">
                 <TextBlock FontSize="15"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource ColorBrush1}"
-                           Text="登录 DreamPort 账号" />
-
-                <StackPanel Spacing="4">
-                    <TextBlock Text="用户名 / 邮箱" />
-                    <TextBox IsEnabled="{Binding !IsBusy}"
-                             Text="{Binding Username, Mode=TwoWay}" />
-                </StackPanel>
-
-                <StackPanel Spacing="4">
-                    <TextBlock Text="密码" />
-                    <TextBox IsEnabled="{Binding !IsBusy}"
-                             PasswordChar="*"
-                             Text="{Binding Password, Mode=TwoWay}" />
-                </StackPanel>
-
-                <StackPanel IsVisible="{Binding IsCaptchaRequired}"
-                            Spacing="6">
-                    <TextBlock Text="图形验证码" />
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                        <Border Grid.Column="0"
-                                Width="120"
-                                Height="40"
-                                Background="{DynamicResource ColorBrushBg0}"
-                                CornerRadius="4">
-                            <Image Source="{Binding CaptchaImage}"
-                                   Stretch="Uniform" />
-                        </Border>
-                        <TextBox Grid.Column="1"
-                                 IsEnabled="{Binding !IsBusy}"
-                                 Text="{Binding CaptchaInput, Mode=TwoWay}" />
-                        <Button Grid.Column="2"
-                                Padding="12,6"
-                                Command="{Binding RefreshCaptchaCommand}"
-                                Content="换一张"
-                                IsEnabled="{Binding !IsBusy}" />
-                    </Grid>
-                </StackPanel>
+                           Text="通过浏览器登录 DreamPort" />
+                <TextBlock FontSize="12"
+                           Opacity="0.85"
+                           TextWrapping="Wrap"
+                           Text="点击下方按钮将打开 DreamPort 网页端进行安全授权确认（原生支持通行密钥、两步验证、图形验证码、账号注册与封禁说明；启动器不采集明文密码）。" />
 
                 <StackPanel Orientation="Horizontal" Spacing="10">
-                    <Button Padding="16,7"
-                            Command="{Binding LoginCommand}"
-                            Content="登录 DreamPort"
+                    <Button Padding="18,8"
+                            Command="{Binding StartBrowserLoginCommand}"
+                            Content="在浏览器中登录"
                             IsEnabled="{Binding !IsBusy}" />
                 </StackPanel>
 
-                <Border IsVisible="{Binding Needs2Fa}"
+                <Border IsVisible="{Binding IsWaitingBrowserConfirm}"
                         Background="{DynamicResource ColorBrushBg0}"
                         BorderBrush="{DynamicResource ColorBrushGray4}"
                         BorderThickness="1"
                         CornerRadius="6"
-                        Padding="12">
-                    <StackPanel Spacing="8">
-                        <TextBlock FontWeight="SemiBold"
-                                   Text="两步验证（TOTP）" />
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                            <TextBox Grid.Column="0"
-                                     IsEnabled="{Binding !IsBusy}"
-                                     Text="{Binding TwoFactorCode, Mode=TwoWay}" />
-                            <Button Grid.Column="1"
-                                    Padding="12,6"
-                                    Command="{Binding SubmitTotpCommand}"
-                                    Content="验证并登录"
-                                    IsEnabled="{Binding !IsBusy}" />
-                            <Button Grid.Column="2"
-                                    Padding="12,6"
-                                    Command="{Binding Cancel2FaCommand}"
-                                    Content="取消"
-                                    IsEnabled="{Binding !IsBusy}" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
+                        Padding="14">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                        <StackPanel Grid.Column="0"
+                                    HorizontalAlignment="Center"
+                                    Spacing="6">
+                            <Border Background="White"
+                                    CornerRadius="6"
+                                    Padding="8">
+                                <Image Width="160"
+                                       Height="160"
+                                       Source="{Binding QrCodeBitmap}"
+                                       Stretch="Uniform" />
+                            </Border>
+                            <TextBlock FontSize="11"
+                                       HorizontalAlignment="Center"
+                                       Opacity="0.75"
+                                       Text="也可用已登录的手机扫码确认" />
+                        </StackPanel>
 
-                <Border IsVisible="{Binding IsBanned}"
-                        Background="{DynamicResource ColorBrushBg0}"
-                        BorderBrush="IndianRed"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="12">
-                    <StackPanel Spacing="4">
-                        <TextBlock FontWeight="SemiBold"
-                                   Foreground="IndianRed"
-                                   Text="账号封禁信息" />
-                        <TextBlock TextWrapping="Wrap"
-                                   Text="{Binding BanSummary}" />
-                    </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    Spacing="8"
+                                    VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock FontWeight="SemiBold"
+                                           Foreground="{DynamicResource ColorBrush1}"
+                                           Text="正在等待确认授权" />
+                                <TextBlock FontWeight="SemiBold"
+                                           Opacity="0.85"
+                                           Text="{Binding CountdownText}" />
+                            </StackPanel>
+
+                            <TextBlock FontSize="12"
+                                       Opacity="0.82"
+                                       TextWrapping="Wrap"
+                                       Text="若浏览器未自动弹出或需要切换到其它浏览器，可复制下方授权链接打开：" />
+
+                            <TextBox IsReadOnly="True"
+                                     Text="{Binding ConfirmUrl}" />
+
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Button Padding="14,6"
+                                        Command="{Binding ReopenBrowserCommand}"
+                                        Content="重新打开浏览器" />
+                                <Button Padding="14,6"
+                                        Command="{Binding CancelBrowserLoginCommand}"
+                                        Content="取消等待" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </StackPanel>
         </Border>

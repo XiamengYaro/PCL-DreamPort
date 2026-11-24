@@ -12,147 +12,188 @@ namespace DreamPort.Test;
 public sealed class DreamPortApiClientTests
 {
     [TestMethod]
-    public async Task Login_AttachesDesktopHeaders_AndHandlesOk()
+    public async Task CreateBrowserLogin_SendsDeviceHeaders_AndAbsolutizesConfirmUrl()
     {
         HttpRequestMessage? captured = null;
-        string? capturedBody = null;
-        var handler = new StubHttpHandler(async (req, _) =>
+        var handler = new StubHttpHandler((req, _) =>
         {
             captured = req;
-            capturedBody = await req.Content!.ReadAsStringAsync();
-            return JsonResponse(HttpStatusCode.OK, new
+            return Task.FromResult(JsonResponse(HttpStatusCode.OK, new
             {
                 success = true,
                 data = new
                 {
-                    token = "jwt-ok-123",
-                    username = "Steve",
-                    status = "active",
-                    isAdmin = true
+                    qrToken = "qr-tok-123",
+                    approveCode = "app-456",
+                    qrUrl = "/qr-login?code=app-456",
+                    expiresAt = 1900000000000L
                 }
-            });
+            }));
         });
 
         using var api = new DreamPortApiClient("https://xmcraft.cn/", handler, disposeHandler: true);
-        var res = await api.LoginAsync("Steve", "pass123");
+        var (session, error) = await api.CreateBrowserLoginAsync();
 
-        Assert.AreEqual(DreamPortLoginOutcome.Ok, res.Outcome);
-        Assert.AreEqual("jwt-ok-123", res.Token);
-        Assert.AreEqual("jwt-ok-123", api.CurrentToken);
-        Assert.AreEqual("Steve", res.Username);
-        Assert.IsTrue(res.IsAdmin);
+        Assert.IsNull(error);
+        Assert.IsNotNull(session);
+        Assert.AreEqual("qr-tok-123", session.QrToken);
+        Assert.AreEqual("app-456", session.ApproveCode);
+        Assert.AreEqual("https://xmcraft.cn/qr-login?code=app-456", session.ConfirmUrl);
+        Assert.AreEqual(1900000000000L, session.ExpiresAtMs);
+
         Assert.IsNotNull(captured);
-        Assert.AreEqual("https://xmcraft.cn/api/login", captured.RequestUri!.ToString());
+        Assert.AreEqual(HttpMethod.Post, captured.Method);
+        Assert.AreEqual("https://xmcraft.cn/api/qr-login/create", captured.RequestUri!.ToString());
         Assert.AreEqual("desktop", captured.Headers.GetValues("X-DreamPort-Surface").Single());
+        Assert.StartsWith("PCL-DreamPort (", captured.Headers.GetValues("X-Device-Name").Single());
         Assert.AreEqual(DreamPortBuildConfig.UserAgent, captured.Headers.UserAgent.ToString());
         Assert.IsFalse(string.IsNullOrWhiteSpace(captured.Headers.GetValues("X-Device-Platform").Single()));
         Assert.IsFalse(string.IsNullOrWhiteSpace(captured.Headers.GetValues("X-Client-Version").Single()));
-        Assert.IsTrue(capturedBody!.Contains("\"username\":\"Steve\"", StringComparison.Ordinal));
     }
 
     [TestMethod]
-    public async Task Login_Need2Fa_NeedCaptcha_AndBannedWithRelativeEvidence()
+    public async Task PollBrowserLogin_MapsAllStates_NotFound_AndNetworkError()
     {
-        var handler2Fa = new StubHttpHandler((_, _) => Task.FromResult(JsonResponse(
-            HttpStatusCode.OK,
-            new
+        var cases = new (HttpStatusCode Code, string StatusText, DreamPortBrowserLoginStatus Expected, string? User, bool Admin)[]
+        {
+            (HttpStatusCode.OK, "pending", DreamPortBrowserLoginStatus.Pending, null, false),
+            (HttpStatusCode.OK, "approved", DreamPortBrowserLoginStatus.Approved, "Steve", true),
+            (HttpStatusCode.OK, "denied", DreamPortBrowserLoginStatus.Denied, null, false),
+            (HttpStatusCode.OK, "expired", DreamPortBrowserLoginStatus.Expired, null, false),
+            (HttpStatusCode.OK, "consumed", DreamPortBrowserLoginStatus.Consumed, null, false)
+        };
+
+        foreach (var item in cases)
+        {
+            var h = new StubHttpHandler((_, _) => Task.FromResult(JsonResponse(item.Code, new
+            {
+                success = true,
+                data = new { status = item.StatusText, username = item.User, isAdmin = item.Admin }
+            })));
+            using var api = new DreamPortApiClient("https://xmcraft.cn", h, disposeHandler: true);
+            var poll = await api.PollBrowserLoginAsync("qr-tok");
+            Assert.AreEqual(item.Expected, poll.Status);
+            Assert.AreEqual(item.User, poll.Username);
+            Assert.AreEqual(item.Admin, poll.IsAdmin);
+        }
+
+        var notFoundHandler = new StubHttpHandler((_, _) => Task.FromResult(JsonResponse(
+            HttpStatusCode.NotFound,
+            new { success = false, message = "登录会话不存在" })));
+        using (var api = new DreamPortApiClient("https://xmcraft.cn", notFoundHandler, disposeHandler: true))
+        {
+            var poll = await api.PollBrowserLoginAsync("missing");
+            Assert.AreEqual(DreamPortBrowserLoginStatus.NotFound, poll.Status);
+        }
+
+        var netHandler = new StubHttpHandler((_, _) => throw new HttpRequestException("connection reset"));
+        using (var api = new DreamPortApiClient("https://xmcraft.cn", netHandler, disposeHandler: true))
+        {
+            var poll = await api.PollBrowserLoginAsync("qr-tok");
+            Assert.AreEqual(DreamPortBrowserLoginStatus.NetworkError, poll.Status);
+        }
+    }
+
+    [TestMethod]
+    public async Task WaitBrowserLoginChange_WakesOnSseData_AndHandlesFailureGracefully()
+    {
+        var sseHandler = new StubHttpHandler((req, _) =>
+        {
+            Assert.AreEqual("https://xmcraft.cn/api/qr-login/wait?token=t1", req.RequestUri!.ToString());
+            var ssePayload = "event: message\ndata: {\"type\":\"changed\"}\n\n";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ssePayload, Encoding.UTF8, "text/event-stream")
+            });
+        });
+
+        using (var api = new DreamPortApiClient("https://xmcraft.cn", sseHandler, disposeHandler: true))
+        {
+            var changed = await api.WaitBrowserLoginChangeAsync("t1", TimeSpan.FromSeconds(5));
+            Assert.IsTrue(changed);
+        }
+
+        var failHandler = new StubHttpHandler((_, _) => throw new HttpRequestException("offline"));
+        using (var api = new DreamPortApiClient("https://xmcraft.cn", failHandler, disposeHandler: true))
+        {
+            var changed = await api.WaitBrowserLoginChangeAsync("t1", TimeSpan.FromSeconds(5));
+            Assert.IsFalse(changed);
+        }
+    }
+
+    [TestMethod]
+    public async Task ConsumeBrowserLogin_SetsTokenWithDeviceHeaders_AndHandlesNonApproved()
+    {
+        HttpRequestMessage? captured = null;
+        var okHandler = new StubHttpHandler((req, _) =>
+        {
+            captured = req;
+            return Task.FromResult(JsonResponse(HttpStatusCode.OK, new
             {
                 success = true,
                 data = new
                 {
-                    status = "needs_2fa",
-                    username = "AdminUser",
-                    isAdmin = true,
-                    challengeId = "chg-999",
-                    passkey = true
+                    token = "client-session-jwt",
+                    username = "Steve",
+                    isAdmin = false
                 }
-            })));
+            }));
+        });
 
-        using (var api = new DreamPortApiClient("https://xmcraft.cn", handler2Fa, disposeHandler: true))
+        using (var api = new DreamPortApiClient("https://xmcraft.cn", okHandler, disposeHandler: true))
         {
-            var r2 = await api.LoginAsync("AdminUser", "pass");
-            Assert.AreEqual(DreamPortLoginOutcome.Need2Fa, r2.Outcome);
-            Assert.AreEqual("chg-999", r2.ChallengeId);
-            Assert.IsTrue(r2.SupportsPasskey);
+            var res = await api.ConsumeBrowserLoginAsync("qr-ok");
+            Assert.IsTrue(res.Ok);
+            Assert.AreEqual(DreamPortBrowserLoginStatus.Approved, res.Status);
+            Assert.AreEqual("client-session-jwt", res.Token);
+            Assert.AreEqual("client-session-jwt", api.CurrentToken);
+            Assert.AreEqual("Steve", res.Username);
+            Assert.IsFalse(res.IsAdmin);
+            Assert.IsNotNull(captured);
+            Assert.AreEqual(HttpMethod.Post, captured.Method);
+            Assert.AreEqual("https://xmcraft.cn/api/qr-login/consume?token=qr-ok", captured.RequestUri!.ToString());
+            Assert.StartsWith("PCL-DreamPort (", captured.Headers.GetValues("X-Device-Name").Single());
+        }
+
+        var consumedHandler = new StubHttpHandler((_, _) => Task.FromResult(JsonResponse(HttpStatusCode.OK, new
+        {
+            success = false,
+            message = "该登录凭据已被使用",
+            data = new { status = "consumed" }
+        })));
+        using (var api = new DreamPortApiClient("https://xmcraft.cn", consumedHandler, disposeHandler: true))
+        {
+            var res = await api.ConsumeBrowserLoginAsync("qr-used");
+            Assert.IsFalse(res.Ok);
+            Assert.AreEqual(DreamPortBrowserLoginStatus.Consumed, res.Status);
             Assert.IsNull(api.CurrentToken);
-        }
-
-        var handlerCaptcha = new StubHttpHandler((_, _) => Task.FromResult(JsonResponse(
-            HttpStatusCode.BadRequest,
-            new { success = false, message = "请完成图形验证码校验" })));
-
-        using (var api = new DreamPortApiClient("https://xmcraft.cn", handlerCaptcha, disposeHandler: true))
-        {
-            var rc = await api.LoginAsync("Steve", "pass");
-            Assert.AreEqual(DreamPortLoginOutcome.NeedCaptcha, rc.Outcome);
-        }
-
-        var handlerBanned = new StubHttpHandler((_, _) => Task.FromResult(JsonResponse(
-            HttpStatusCode.Forbidden,
-            new
-            {
-                success = false,
-                data = new
-                {
-                    banned = true,
-                    username = "BadPlayer",
-                    reason = "违规破坏",
-                    banUntil = 1900000000000L,
-                    evidence = new[]
-                    {
-                        new { id = "e1", fileUrl = "/uploads/ban-proof.png", note = "截图", mediaType = "image/png" }
-                    }
-                }
-            })));
-
-        using (var api = new DreamPortApiClient("https://xmcraft.cn", handlerBanned, disposeHandler: true))
-        {
-            var rb = await api.LoginAsync("BadPlayer", "pass");
-            Assert.AreEqual(DreamPortLoginOutcome.Banned, rb.Outcome);
-            Assert.AreEqual("违规破坏", rb.BanReason);
-            Assert.HasCount(1, rb.Evidence);
-            Assert.AreEqual("https://xmcraft.cn/uploads/ban-proof.png", rb.Evidence[0].FileUrl);
         }
     }
 
     [TestMethod]
-    public async Task CaptchaAndConfig_SupportBareAndWrappedJson()
+    public async Task GetConfigAsync_ParsesSiteMetadata()
     {
         var handler = new StubHttpHandler((req, _) =>
         {
-            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath == "/api/config")
+            Assert.AreEqual("/api/config", req.RequestUri!.AbsolutePath);
+            return Task.FromResult(JsonResponse(HttpStatusCode.OK, new
             {
-                return Task.FromResult(JsonResponse(HttpStatusCode.OK, new
+                success = true,
+                data = new
                 {
-                    success = true,
-                    data = new
-                    {
-                        siteName = "夏日小镇",
-                        captcha = new { login = true }
-                    }
-                }));
-            }
-
-            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath == "/api/captcha/generate")
-            {
-                // 服务端裸对象返回，未包 {success, data}
-                return Task.FromResult(JsonResponse(HttpStatusCode.OK, new
-                {
-                    captchaToken = "cap-bare-1",
-                    image = "data:image/png;base64,iVBORw0KGgo="
-                }));
-            }
-
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+                    siteName = "夏日小镇",
+                    publicUrl = "https://xmcraft.cn",
+                    captcha = new { login = true }
+                }
+            }));
         });
 
         using var api = new DreamPortApiClient("https://xmcraft.cn", handler, disposeHandler: true);
-        Assert.IsTrue(await api.IsLoginCaptchaRequiredAsync());
-
-        var cap = await api.GenerateCaptchaAsync();
-        Assert.IsNotNull(cap);
-        Assert.AreEqual("cap-bare-1", cap.CaptchaToken);
-        Assert.StartsWith("data:image/png;base64,", cap.ImageDataUri);
+        var cfg = await api.GetConfigAsync();
+        Assert.IsNotNull(cfg);
+        Assert.AreEqual("夏日小镇", cfg.SiteName);
+        Assert.AreEqual("https://xmcraft.cn", cfg.PublicUrl);
+        Assert.IsTrue(cfg.LoginCaptchaRequired);
     }
 
     [TestMethod]
@@ -256,6 +297,18 @@ public sealed class DreamPortApiClientTests
             if (Directory.Exists(tempDir))
                 Directory.Delete(tempDir, recursive: true);
         }
+    }
+
+    [TestMethod]
+    public void BuildConfig_KeepsUpdateMirrorAndCleanDownloadUserAgent()
+    {
+        Assert.AreEqual("https://dl.xmcraft.cn", DreamPortBuildConfig.UpdateMirrorBaseUrl);
+
+        var dlUa = DreamPortBuildConfig.DownloadUserAgent;
+        Assert.StartsWith("PCL-DreamPort/", dlUa);
+        Assert.IsFalse(dlUa.Contains('('));
+        Assert.IsFalse(dlUa.Contains(')'));
+        Assert.IsFalse(dlUa.Contains("://", StringComparison.Ordinal));
     }
 
     private static HttpResponseMessage JsonResponse(HttpStatusCode status, object body)

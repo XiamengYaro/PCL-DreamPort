@@ -3698,11 +3698,6 @@
     <sys:String x:Key="Setup.Ui.Background.ImageLoadFailed">Failed to load the image, trying to play the file as a video: {0}</sys:String>
     <sys:String x:Key="Setup.Ui.Background.PauseVideo">Pause video backgrounds whilst an instance is running</sys:String>
     <sys:String x:Key="Setup.Ui.Background.PauseVideo.ToolTip">If enabled, the background cannot be refreshed whilst the game is running</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort">DreamPort Mirror</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort.Auto">Auto (DreamPort Mirror, then BMCLAPI &amp; Official)</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort.SelfFirst">DreamPort Mirror First (with Official fallback)</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort.BmclapiFirst">BMCLAPI First (then DreamPort Mirror)</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort.OfficialFirst">Official First (no mirror priority)</sys:String>
     <sys:String x:Key="Tools.Left.DreamPort">DreamPort</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortAccount">DreamPort Account</sys:String>
 </ResourceDictionary>

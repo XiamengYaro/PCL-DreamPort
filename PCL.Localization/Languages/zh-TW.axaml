@@ -3698,11 +3698,6 @@
     <sys:String x:Key="Setup.Ui.Background.ImageLoadFailed">圖片載入失敗，嘗試將檔案作為影片播放：{0}</sys:String>
     <sys:String x:Key="Setup.Ui.Background.PauseVideo">遊戲啟動後暫停影片背景，遊戲退出後重新播放</sys:String>
     <sys:String x:Key="Setup.Ui.Background.PauseVideo.ToolTip">若啟用此項設定，遊戲時將無法重新整理背景</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort">DreamPort 鏡像</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort.Auto">自動（優先夢港鏡像，其次 BMCLAPI 與官方）</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort.SelfFirst">優先夢港鏡像（含官方備援）</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort.BmclapiFirst">優先 BMCLAPI（次選夢港鏡像）</sys:String>
-    <sys:String x:Key="Setup.GameManage.Source.DreamPort.OfficialFirst">優先官方來源（不優先加速鏡像）</sys:String>
     <sys:String x:Key="Tools.Left.DreamPort">夢港</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortAccount">夢港帳號</sys:String>
 </ResourceDictionary>

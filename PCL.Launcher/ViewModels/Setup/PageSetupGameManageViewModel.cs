@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using DreamPort.Core.Config;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Dialogs;
@@ -14,14 +13,7 @@ public partial class PageSetupGameManageViewModel : ViewModelBase
         0,
         Config.Download.Comp.CompSourceSolution);
 
-    [ObservableProperty] private int _dreamPortSourceIndex = Math.Clamp(
-        Config.Download.DreamPortSourceMode,
-        0,
-        3);
-
     [ObservableProperty] private int _fileSourceIndex = Math.Max(0, Config.Download.FileSource);
-
-    public bool DreamPortMirrorVisible => DreamPortBuildConfig.IsMirrorEnabled;
 
     [ObservableProperty] private int _httpModeIndex = Math.Max(0, (int)Config.Download.HttpMode);
 
@@ -52,11 +44,6 @@ public partial class PageSetupGameManageViewModel : ViewModelBase
         if (value >= 0) Config.Download.FileSource = value;
     }
 
-    partial void OnDreamPortSourceIndexChanged(int value)
-    {
-        if (value >= 0) Config.Download.DreamPortSourceMode = Math.Clamp(value, 0, 3);
-    }
-
     partial void OnVersionListIndexChanged(int value)
     {
         if (value >= 0) Config.Download.VersionListSource = value;
@@ -85,7 +72,6 @@ public partial class PageSetupGameManageViewModel : ViewModelBase
     public void Reload()
     {
         HttpModeIndex = Math.Clamp((int)Config.Download.HttpMode, 0, 2);
-        DreamPortSourceIndex = Math.Clamp(Config.Download.DreamPortSourceMode, 0, 3);
         FileSourceIndex = Math.Clamp(Config.Download.FileSource, 0, 2);
         VersionListIndex = Math.Clamp(Config.Download.VersionListSource, 0, 2);
         TranslateFormatIndex = Math.Clamp(Config.Download.Comp.NameFormatV2, 0, 4);

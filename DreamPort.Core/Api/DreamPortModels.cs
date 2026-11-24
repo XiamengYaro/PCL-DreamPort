@@ -1,45 +1,41 @@
 namespace DreamPort.Core.Api;
 
-public enum DreamPortLoginOutcome
-{
-    Ok,
-    Need2Fa,
-    Need2FaSetup,
-    Banned,
-    NeedCaptcha,
-    Error
-}
-
 public enum DreamPortFailureReason
 {
     Expired,
     Network
 }
 
-public sealed record DreamPortBanEvidence(
-    string Id,
-    string FileUrl,
-    string? Note,
-    string? MediaType);
-
-public sealed record DreamPortLoginResult
+public enum DreamPortBrowserLoginStatus
 {
-    public required DreamPortLoginOutcome Outcome { get; init; }
-    public string? Token { get; init; }
-    public string? Username { get; init; }
-    public string? Status { get; init; }
-    public bool IsAdmin { get; init; }
-    public string? ChallengeId { get; init; }
-    public bool SupportsPasskey { get; init; }
-    public string? BanReason { get; init; }
-    public long? BanUntil { get; init; }
-    public IReadOnlyList<DreamPortBanEvidence> Evidence { get; init; } = [];
-    public string? ErrorMessage { get; init; }
+    Pending,
+    Approved,
+    Denied,
+    Expired,
+    Consumed,
+    NotFound,
+    NetworkError
 }
 
-public sealed record DreamPortCaptchaResult(
-    string CaptchaToken,
-    string ImageDataUri);
+public sealed record DreamPortBrowserLoginSession(
+    string QrToken,
+    string ApproveCode,
+    string ConfirmUrl,
+    long ExpiresAtMs);
+
+public sealed record DreamPortBrowserLoginPollResult(
+    DreamPortBrowserLoginStatus Status,
+    string? Username = null,
+    bool IsAdmin = false,
+    string? Message = null);
+
+public sealed record DreamPortBrowserLoginConsumeResult(
+    bool Ok,
+    DreamPortBrowserLoginStatus Status,
+    string? Token = null,
+    string? Username = null,
+    bool IsAdmin = false,
+    string? Message = null);
 
 public sealed record DreamPortConfigResult(
     string? SiteName,

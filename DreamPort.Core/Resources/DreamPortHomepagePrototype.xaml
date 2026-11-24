@@ -6,7 +6,7 @@
     <local:MyCard Title="夏日小镇 · DreamPort" Margin="0,0,0,15">
         <StackPanel Margin="25,40,23,15">
             <TextBlock TextWrapping="Wrap" Margin="0,0,0,10"
-                       Text="欢迎来到梦港！您可以在「工具 → 梦港账号」登录站点账号，在「启动 → 微软登录」绑定并选择正版账号，并在「设置 → 游戏管理」切换自建梦港镜像源（dl.xmcraft.cn）。" />
+                       Text="欢迎来到梦港！您可以在「工具 → 梦港账号」通过浏览器授权登录站点账号，在「启动 → 微软登录」绑定并选择正版账号。" />
             <StackPanel Orientation="Horizontal">
                 <local:MyButton Padding="13,6" Margin="0,0,10,0" ColorType="Highlight"
                                 Text="打开梦港网页端" EventType="打开网页" EventData="https://xmcraft.cn" />

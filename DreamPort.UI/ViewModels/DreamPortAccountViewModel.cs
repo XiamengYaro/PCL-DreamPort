@@ -11,30 +11,25 @@ using PCL.Core.App;
 namespace DreamPort.UI.ViewModels;
 
 /// <summary>
-/// DreamPort 账号登录与主页模式切换视图模型（Phase 1 PoC）。
+/// DreamPort 账号登录（浏览器确认 + 同码二维码兼容）与主页模式切换视图模型。
 /// </summary>
 public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 {
     private readonly DreamPortSessionStore _store;
     private readonly Action? _onHomepagePreferenceChanged;
+    private readonly Action<string> _openUrl;
     private readonly Func<string, DreamPortApiClient> _clientFactory;
     private DreamPortApiClient _api;
-    private string? _captchaToken;
-    private string? _challengeId;
+    private CancellationTokenSource? _waitCts;
     private bool _initialized;
 
     [ObservableProperty] private string _baseUrl = DreamPortBuildConfig.BaseUrl;
-    [ObservableProperty] private string _username = string.Empty;
-    [ObservableProperty] private string _password = string.Empty;
-    [ObservableProperty] private bool _isCaptchaRequired;
-    [ObservableProperty] private string _captchaInput = string.Empty;
-    [ObservableProperty] private Bitmap? _captchaImage;
-    [ObservableProperty] private bool _needs2Fa;
-    [ObservableProperty] private string _twoFactorCode = string.Empty;
     [ObservableProperty] private bool _isLoggedIn;
     [ObservableProperty] private bool _isBusy;
-    [ObservableProperty] private bool _isBanned;
-    [ObservableProperty] private string _banSummary = string.Empty;
+    [ObservableProperty] private bool _isWaitingBrowserConfirm;
+    [ObservableProperty] private string _confirmUrl = string.Empty;
+    [ObservableProperty] private Bitmap? _qrCodeBitmap;
+    [ObservableProperty] private string _countdownText = string.Empty;
     [ObservableProperty] private string _statusMessage = "未登录 DreamPort 站点账号。";
     [ObservableProperty] private bool _isStatusError;
     [ObservableProperty] private string _loggedInUsername = string.Empty;
@@ -44,11 +39,13 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
     public DreamPortAccountViewModel(
         Action? onHomepagePreferenceChanged = null,
         DreamPortSessionStore? store = null,
-        Func<string, DreamPortApiClient>? clientFactory = null)
+        Func<string, DreamPortApiClient>? clientFactory = null,
+        Action<string>? openUrl = null)
     {
         _onHomepagePreferenceChanged = onHomepagePreferenceChanged;
         _store = store ?? new DreamPortSessionStore();
         _clientFactory = clientFactory ?? (url => new DreamPortApiClient(url));
+        _openUrl = openUrl ?? (url => Basics.OpenPath(url));
 
         var saved = _store.Load();
         _baseUrl = saved.BaseUrl;
@@ -82,10 +79,10 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 
         if (!string.IsNullOrEmpty(saved.Username) && !saved.IsTokenPersistent)
         {
-            SetStatus("上次登录凭据未持久保存（系统加密存储不可用），请重新输入密码登录。", isError: false);
+            SetStatus("上次登录凭据未持久保存（系统加密存储不可用），请通过浏览器重新授权登录。", isError: false);
         }
 
-        await ProbeConfigAndCaptchaAsync();
+        await ProbeConfigAsync();
     }
 
     [RelayCommand]
@@ -95,117 +92,71 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             return;
 
         _store.SaveBaseUrlOnly(_api.BaseUrl);
-        await ProbeConfigAndCaptchaAsync();
+        await ProbeConfigAsync();
     }
 
     [RelayCommand]
-    private async Task RefreshCaptchaAsync()
+    private async Task StartBrowserLoginAsync()
     {
         if (!EnsureClientForBaseUrl())
             return;
 
+        CancelActiveLoginWait();
         IsBusy = true;
+        SetStatus("正在创建 DreamPort 授权会话...", isError: false);
+
+        (DreamPortBrowserLoginSession? session, string? error) createResult;
         try
         {
-            var captcha = await _api.GenerateCaptchaAsync();
-            if (captcha is null)
-            {
-                SetStatus("获取图形验证码失败，请检查站点地址与网络。", isError: true);
-                return;
-            }
-
-            _captchaToken = captcha.CaptchaToken;
-            CaptchaInput = string.Empty;
-            var bmp = ImageDataUriHelper.TryDecodeRasterImage(captcha.ImageDataUri);
-            if (bmp is null)
-            {
-                CaptchaImage = null;
-                SetStatus("站点返回了暂不支持的验证码格式（如 SVG），请确认服务端支持 PNG Base64。", isError: true);
-                return;
-            }
-
-            CaptchaImage = bmp;
+            createResult = await _api.CreateBrowserLoginAsync();
         }
         finally
         {
             IsBusy = false;
         }
+
+        if (createResult.session is null)
+        {
+            SetStatus(createResult.error ?? "发起浏览器授权登录失败。", isError: true);
+            return;
+        }
+
+        var session = createResult.session;
+        ConfirmUrl = session.ConfirmUrl;
+        QrCodeBitmap = QrCodeRenderer.RenderToBitmap(session.ConfirmUrl, 6);
+        IsWaitingBrowserConfirm = true;
+        UpdateCountdown(session.ExpiresAtMs);
+
+        var browserOpened = TryOpenBrowser(session.ConfirmUrl);
+        SetStatus(
+            browserOpened
+                ? "已打开系统浏览器授权页，请在浏览器中登录并点击「确认登录」（也可使用已登录的手机扫码）。"
+                : "未能自动打开浏览器，请复制下方授权链接到浏览器中打开，或用手机扫码确认。",
+            isError: false);
+
+        var cts = new CancellationTokenSource();
+        _waitCts = cts;
+        _ = RunBrowserLoginWaitLoopAsync(session, cts);
     }
 
     [RelayCommand]
-    private async Task LoginAsync()
+    private void ReopenBrowser()
     {
-        if (!EnsureClientForBaseUrl())
+        if (string.IsNullOrWhiteSpace(ConfirmUrl))
             return;
 
-        if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrEmpty(Password))
-        {
-            SetStatus("请输入账号与密码。", isError: true);
-            return;
-        }
-
-        if (IsCaptchaRequired && (string.IsNullOrWhiteSpace(_captchaToken) || string.IsNullOrWhiteSpace(CaptchaInput)))
-        {
-            SetStatus("请输入图形验证码。", isError: true);
-            return;
-        }
-
-        IsBusy = true;
-        IsBanned = false;
-        BanSummary = string.Empty;
-        SetStatus("正在登录 DreamPort...", isError: false);
-
-        try
-        {
-            var res = await _api.LoginAsync(
-                Username.Trim(),
-                Password,
-                IsCaptchaRequired ? _captchaToken : null,
-                IsCaptchaRequired ? CaptchaInput : null);
-
-            await HandleLoginResultAsync(res);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        var ok = TryOpenBrowser(ConfirmUrl);
+        SetStatus(
+            ok ? "已重新在系统浏览器中打开授权页面，请完成确认。" : "拉起浏览器失败，请手动复制下方链接打开。",
+            isError: !ok);
     }
 
     [RelayCommand]
-    private async Task SubmitTotpAsync()
+    private void CancelBrowserLogin()
     {
-        if (string.IsNullOrEmpty(_challengeId))
-        {
-            SetStatus("二次验证会话已失效，请重新登录。", isError: true);
-            Needs2Fa = false;
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(TwoFactorCode))
-        {
-            SetStatus("请输入 6 位动态验证码。", isError: true);
-            return;
-        }
-
-        IsBusy = true;
-        try
-        {
-            var res = await _api.SubmitTotpAsync(_challengeId, TwoFactorCode);
-            await HandleLoginResultAsync(res);
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    private void Cancel2Fa()
-    {
-        Needs2Fa = false;
-        _challengeId = null;
-        TwoFactorCode = string.Empty;
-        SetStatus("已取消二次验证。", isError: false);
+        CancelActiveLoginWait();
+        ClearWaitingState();
+        SetStatus("已取消本次浏览器授权登录。", isError: false);
     }
 
     [RelayCommand]
@@ -234,7 +185,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                 IsLoggedIn = false;
                 LoggedInUsername = string.Empty;
                 AccountMetaSummary = string.Empty;
-                SetStatus(valid.Message ?? "登录已过期，请重新登录。", isError: true);
+                SetStatus(valid.Message ?? "登录已过期，请通过浏览器重新授权登录。", isError: true);
                 return;
             }
 
@@ -255,19 +206,16 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task LogoutAsync()
     {
+        CancelActiveLoginWait();
+        ClearWaitingState();
         IsBusy = true;
         try
         {
             await _api.LogoutAsync();
             _store.ClearToken(_api.BaseUrl);
             IsLoggedIn = false;
-            Needs2Fa = false;
-            IsBanned = false;
-            BanSummary = string.Empty;
             LoggedInUsername = string.Empty;
             AccountMetaSummary = string.Empty;
-            Password = string.Empty;
-            TwoFactorCode = string.Empty;
             SetStatus("已退出登录并吊销当前设备会话。", isError: false);
         }
         finally
@@ -295,10 +243,143 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        CancelActiveLoginWait();
         _api.Dispose();
     }
 
-    private async Task ProbeConfigAndCaptchaAsync()
+    private async Task RunBrowserLoginWaitLoopAsync(DreamPortBrowserLoginSession session, CancellationTokenSource cts)
+    {
+        var ct = cts.Token;
+        using var tickerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var tickerTask = RunCountdownTickerAsync(session.ExpiresAtMs, tickerCts.Token);
+
+        try
+        {
+            await WaitForApprovalLoopAsync(session, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // 用户主动取消或发起新一轮授权
+        }
+        finally
+        {
+            tickerCts.Cancel();
+            try
+            {
+                await tickerTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // expected
+            }
+
+            if (ReferenceEquals(_waitCts, cts))
+            {
+                _waitCts.Dispose();
+                _waitCts = null;
+            }
+        }
+    }
+
+    private async Task WaitForApprovalLoopAsync(DreamPortBrowserLoginSession session, CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() >= session.ExpiresAtMs)
+            {
+                ClearWaitingState();
+                SetStatus("登录授权已超时（5 分钟有效），请重新点击「在浏览器中登录」。", isError: true);
+                return;
+            }
+
+            var poll = await _api.PollBrowserLoginAsync(session.QrToken, ct);
+            switch (poll.Status)
+            {
+                case DreamPortBrowserLoginStatus.Approved:
+                {
+                    var consumed = await _api.ConsumeBrowserLoginAsync(session.QrToken, ct);
+                    if (consumed.Ok)
+                    {
+                        ClearWaitingState();
+                        var saved = _store.Save(_api.BaseUrl, consumed.Username, consumed.IsAdmin, consumed.Token);
+                        IsLoggedIn = true;
+                        LoggedInUsername = saved.Username ?? string.Empty;
+
+                        var profile = await _api.GetProfileAsync(ct);
+                        UpdateMetaSummary(saved.IsAdmin, saved.IsTokenPersistent, profile);
+                        var suffix = saved.IsTokenPersistent ? "凭据已加密保存。" : "系统加密存储不可用，本次令牌仅保留在内存中。";
+                        SetStatus($"✓ 授权登录成功，欢迎 {LoggedInUsername}！{suffix}", isError: false);
+                        return;
+                    }
+
+                    if (consumed.Status == DreamPortBrowserLoginStatus.NetworkError)
+                    {
+                        SetStatus("已确认授权，获取令牌时遇到网络波动，正在自动重试...", isError: false);
+                        await Task.Delay(TimeSpan.FromSeconds(2), ct);
+                        continue;
+                    }
+
+                    ClearWaitingState();
+                    SetStatus(consumed.Message ?? "授权凭据已失效，请重新登录。", isError: true);
+                    return;
+                }
+                case DreamPortBrowserLoginStatus.Denied:
+                    ClearWaitingState();
+                    SetStatus("已在确认端拒绝此次登录请求。", isError: true);
+                    return;
+
+                case DreamPortBrowserLoginStatus.Expired:
+                case DreamPortBrowserLoginStatus.NotFound:
+                    ClearWaitingState();
+                    SetStatus(poll.Message ?? "本次登录授权已过期，请重新点击「在浏览器中登录」。", isError: true);
+                    return;
+
+                case DreamPortBrowserLoginStatus.Consumed:
+                    ClearWaitingState();
+                    SetStatus("该登录授权凭据已被使用，请重新发起。", isError: true);
+                    return;
+
+                case DreamPortBrowserLoginStatus.NetworkError:
+                    SetStatus("连接站点遇到短暂波动，仍在等待浏览器确认...", isError: false);
+                    await Task.Delay(TimeSpan.FromSeconds(2), ct);
+                    continue;
+
+                default:
+                {
+                    var waitStarted = DateTimeOffset.UtcNow;
+                    await _api.WaitBrowserLoginChangeAsync(session.QrToken, TimeSpan.FromSeconds(10), ct);
+                    var elapsed = DateTimeOffset.UtcNow - waitStarted;
+                    if (elapsed < TimeSpan.FromMilliseconds(1500))
+                        await Task.Delay(TimeSpan.FromMilliseconds(1500) - elapsed, ct);
+                    continue;
+                }
+            }
+        }
+    }
+
+    private async Task RunCountdownTickerAsync(long expiresAtMs, CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        while (await timer.WaitForNextTickAsync(ct))
+        {
+            UpdateCountdown(expiresAtMs);
+        }
+    }
+
+    private void UpdateCountdown(long expiresAtMs)
+    {
+        var remainingMs = expiresAtMs - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        if (remainingMs <= 0)
+        {
+            CountdownText = "剩余 00:00（即将超时）";
+            return;
+        }
+
+        var remaining = TimeSpan.FromMilliseconds(remainingMs);
+        CountdownText = $"剩余 {(int)remaining.TotalMinutes:D2}:{remaining.Seconds:D2}";
+    }
+
+    private async Task ProbeConfigAsync()
     {
         IsBusy = true;
         try
@@ -310,11 +391,8 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            IsCaptchaRequired = cfg.LoginCaptchaRequired;
             var name = string.IsNullOrWhiteSpace(cfg.SiteName) ? _api.BaseUrl : cfg.SiteName;
             SetStatus($"✓ 已连通站点：{name}", isError: false);
-            if (IsCaptchaRequired)
-                await RefreshCaptchaAsync();
         }
         finally
         {
@@ -322,57 +400,46 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task HandleLoginResultAsync(DreamPortLoginResult res)
+    private bool TryOpenBrowser(string url)
     {
-        switch (res.Outcome)
+        try
         {
-            case DreamPortLoginOutcome.Ok:
-            {
-                Password = string.Empty;
-                TwoFactorCode = string.Empty;
-                CaptchaInput = string.Empty;
-                Needs2Fa = false;
-                _challengeId = null;
-
-                var saved = _store.Save(_api.BaseUrl, res.Username, res.IsAdmin, res.Token);
-                IsLoggedIn = true;
-                LoggedInUsername = saved.Username ?? Username.Trim();
-                var profile = await _api.GetProfileAsync();
-                UpdateMetaSummary(saved.IsAdmin, saved.IsTokenPersistent, profile);
-
-                var suffix = saved.IsTokenPersistent ? "凭据已加密保存。" : "系统加密存储不可用，本次令牌仅保留在内存中。";
-                SetStatus($"✓ 登录成功，欢迎 {LoggedInUsername}！{suffix}", isError: false);
-                return;
-            }
-            case DreamPortLoginOutcome.Need2Fa:
-                Needs2Fa = true;
-                _challengeId = res.ChallengeId;
-                TwoFactorCode = string.Empty;
-                SetStatus("此账号已开启两步验证，请输入 TOTP 动态验证码。", isError: false);
-                return;
-
-            case DreamPortLoginOutcome.Need2FaSetup:
-                Needs2Fa = false;
-                SetStatus(res.ErrorMessage ?? "需要前往网页端完成 2FA 绑定。", isError: true);
-                return;
-
-            case DreamPortLoginOutcome.NeedCaptcha:
-                IsCaptchaRequired = true;
-                SetStatus(string.IsNullOrWhiteSpace(res.ErrorMessage) ? "请先完成图形验证码。" : res.ErrorMessage, isError: true);
-                await RefreshCaptchaAsync();
-                return;
-
-            case DreamPortLoginOutcome.Banned:
-                Needs2Fa = false;
-                IsBanned = true;
-                BanSummary = FormatBanSummary(res);
-                SetStatus("✗ 该账号已被封禁，无法登录。", isError: true);
-                return;
-
-            default:
-                SetStatus(res.ErrorMessage ?? "登录失败。", isError: true);
-                return;
+            _openUrl(url);
+            return true;
         }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void CancelActiveLoginWait()
+    {
+        var existing = _waitCts;
+        _waitCts = null;
+        if (existing is null)
+            return;
+
+        try
+        {
+            existing.Cancel();
+        }
+        catch
+        {
+            // ignore
+        }
+        finally
+        {
+            existing.Dispose();
+        }
+    }
+
+    private void ClearWaitingState()
+    {
+        IsWaitingBrowserConfirm = false;
+        ConfirmUrl = string.Empty;
+        QrCodeBitmap = null;
+        CountdownText = string.Empty;
     }
 
     private bool EnsureClientForBaseUrl()
@@ -420,33 +487,6 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
     {
         StatusMessage = message;
         IsStatusError = isError;
-    }
-
-    private static string FormatBanSummary(DreamPortLoginResult res)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine($"封禁原因：{res.BanReason ?? "未提供理由"}");
-        if (res.BanUntil is > 0)
-        {
-            var dt = DateTimeOffset.FromUnixTimeMilliseconds(res.BanUntil.Value).ToLocalTime();
-            sb.AppendLine($"解封时间：{dt:yyyy-MM-dd HH:mm:ss}");
-        }
-        else
-        {
-            sb.AppendLine("封禁时长：永久");
-        }
-
-        if (res.Evidence.Count > 0)
-        {
-            sb.AppendLine("公开证据附件：");
-            foreach (var ev in res.Evidence)
-            {
-                var label = string.IsNullOrWhiteSpace(ev.Note) ? ev.FileUrl : $"{ev.Note} ({ev.FileUrl})";
-                sb.AppendLine("- " + label);
-            }
-        }
-
-        return sb.ToString().TrimEnd();
     }
 
     private static int SafeGetDreamPortHomepageMode()

@@ -14,8 +14,8 @@
   - 应用数据目录独立隔离为 `PCL-DreamPort`，不影响原有 PCL CE 数据
 - **仅正版游戏账号**：屏蔽离线登录与外置登录入口，保留微软正版登录并内置设备码扫描二维码
 - **联机能力**：移除 Natayark ID 门控与上游遥测，保留 `EasyTier` 联机核心开箱可用（后续阶段接入「梦港联机」TCP/TLS 中继）
-- **自建梦港镜像源**：支持 `自动（优先梦港源） / 梦港源 / BMCLAPI / 官方源`（默认 `https://dl.xmcraft.cn`），严格对齐 16 条映射规则并隔离下载层 User-Agent
-- **梦港账号登录原型**：「工具 → 梦港账号」支持设置站点地址、密码 + 图形验证码登录、TOTP 两步验证与安全存储会话
+- **下载与更新源分工**：游戏数据下载沿用 PCL 原生官方源 / BMCLAPI 并隔离下载层 User-Agent（`PCL-DreamPort/{version}`）；梦港加速源（`https://dl.xmcraft.cn`，`DP_UPDATE_MIRROR_URL`）仅用于启动器更新等配套服务
+- **梦港账号登录原型**：「工具 → 梦港账号」支持设置站点地址并通过浏览器确认登录（复用 `/api/qr-login/*` 授权流，支持电脑浏览器确认与同码手机扫码确认，启动器不采集明文密码）与安全存储会话
 - **PCL 原生自定义主页原型**：首次启动默认承载梦港 PCL XAML 原型，并支持对接服务端 `GET /api/client/pcl-homepage`（不可达时优雅回退本地原型）
 
 ## 运行环境要求
@@ -48,9 +48,8 @@ PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.0-poc di
 | 环境变量 / 构建参数 | 默认值 | 说明 |
 |---|---|---|
 | `DP_BASE_URL` | `https://xmcraft.cn` | DreamPort 站点根地址 |
-| `DP_MIRROR_HOST` | `https://dl.xmcraft.cn` | 自建镜像基址；设为 `off` 可隐藏梦港源 |
 | `DP_REPO_URL` | `https://github.com/Xiameng/PCL-DreamPort` | 开源仓库地址 |
-| `DP_UPDATE_MIRROR_URL` | `https://dl.xmcraft.cn` | 更新下载加速源 |
+| `DP_UPDATE_MIRROR_URL` | `https://dl.xmcraft.cn` | 更新等配套服务下载加速源（不用于游戏数据下载） |
 | `PCL_MS_CLIENT_ID` | （必填） | 自有 Azure 正版登录 Client ID（构建期注入；Debug 支持 `DP_MS_CLIENT_ID`） |
 
 ## 开源许可

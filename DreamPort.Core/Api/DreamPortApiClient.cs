@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -8,12 +7,13 @@ using DreamPort.Core.Config;
 namespace DreamPort.Core.Api;
 
 /// <summary>
-/// DreamPort 站点 API 客户端（Phase 1 原型与通用基础设施）。
-/// 对齐服务端 `{success, message, data}` 包装与裸响应例外、四分支登录、20s 超时与网络错误三态语义。
+/// DreamPort 站点 API 客户端（浏览器授权登录 / 会话校验与设备登记）。
+/// 对齐服务端 `{success, message, data}` 包装、20s 超时与网络错误三态语义。
 /// </summary>
 public sealed class DreamPortApiClient : IDisposable
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan MaxSseWait = TimeSpan.FromSeconds(15);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _http;
@@ -99,65 +99,156 @@ public sealed class DreamPortApiClient : IDisposable
         return new DreamPortConfigResult(siteName, loginCaptcha, publicUrl);
     }
 
-    public async Task<bool> IsLoginCaptchaRequiredAsync(CancellationToken ct = default)
-    {
-        var cfg = await GetConfigAsync(ct).ConfigureAwait(false);
-        return cfg?.LoginCaptchaRequired == true;
-    }
-
-    public async Task<DreamPortCaptchaResult?> GenerateCaptchaAsync(CancellationToken ct = default)
-    {
-        var res = await SendAsync(HttpMethod.Post, "/api/captcha/generate", auth: false, ct: ct).ConfigureAwait(false);
-        if (res.Status != 200)
-            return null;
-
-        var data = UnwrapData(res.Body);
-        if (data.ValueKind != JsonValueKind.Object)
-            return null;
-
-        var token = GetString(data, "captchaToken");
-        var image = GetString(data, "image");
-        if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(image))
-            return null;
-
-        return new DreamPortCaptchaResult(token, image);
-    }
-
-    public async Task<DreamPortLoginResult> LoginAsync(
-        string username,
-        string password,
-        string? captchaToken = null,
-        string? captchaAnswer = null,
-        CancellationToken ct = default)
-    {
-        var payload = new Dictionary<string, object?>
-        {
-            ["username"] = username,
-            ["password"] = password
-        };
-        if (!string.IsNullOrWhiteSpace(captchaToken) && !string.IsNullOrWhiteSpace(captchaAnswer))
-        {
-            payload["captchaToken"] = captchaToken;
-            payload["captchaAnswer"] = captchaAnswer.Trim();
-        }
-
-        var res = await SendAsync(HttpMethod.Post, "/api/login", payload, auth: false, ct: ct).ConfigureAwait(false);
-        return ParseLoginResponse(res, username);
-    }
-
-    public async Task<DreamPortLoginResult> SubmitTotpAsync(
-        string challengeId,
-        string code,
+    /// <summary>创建浏览器/扫码授权登录会话，返回轮询凭据与浏览器确认地址。</summary>
+    public async Task<(DreamPortBrowserLoginSession? Session, string? ErrorMessage)> CreateBrowserLoginAsync(
         CancellationToken ct = default)
     {
         var res = await SendAsync(
             HttpMethod.Post,
-            "/api/login/2fa",
-            new { challengeId, code = code.Trim() },
+            "/api/qr-login/create",
+            jsonBody: new { },
             auth: false,
             ct: ct).ConfigureAwait(false);
 
-        return ParseLoginResponse(res, fallbackUsername: string.Empty, defaultError: "二次验证失败");
+        if (res.Status == 0)
+            return (null, BuildNetworkError(res, "无法连接站点"));
+
+        if (res.Status != 200)
+            return (null, ExtractMessage(res.Body, $"发起授权登录失败（HTTP {res.Status}）"));
+
+        var data = UnwrapData(res.Body);
+        var qrToken = GetString(data, "qrToken");
+        var approveCode = GetString(data, "approveCode");
+        if (string.IsNullOrWhiteSpace(qrToken) || string.IsNullOrWhiteSpace(approveCode))
+            return (null, "服务端未返回有效的授权会话凭据");
+
+        var relUrl = GetString(data, "qrUrl");
+        if (string.IsNullOrWhiteSpace(relUrl))
+            relUrl = "/qr-login?code=" + Uri.EscapeDataString(approveCode);
+
+        var confirmUrl = ResolveAbsoluteUrl(relUrl);
+        var expiresAt = GetLong(data, "expiresAt")
+            ?? DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeMilliseconds();
+
+        return (new DreamPortBrowserLoginSession(qrToken, approveCode, confirmUrl, expiresAt), null);
+    }
+
+    /// <summary>轮询浏览器/扫码授权状态（不取令牌）。</summary>
+    public async Task<DreamPortBrowserLoginPollResult> PollBrowserLoginAsync(
+        string qrToken,
+        CancellationToken ct = default)
+    {
+        var path = "/api/qr-login/poll?token=" + Uri.EscapeDataString(qrToken);
+        var res = await SendAsync(HttpMethod.Get, path, auth: false, ct: ct).ConfigureAwait(false);
+
+        if (res.Status == 0)
+            return new DreamPortBrowserLoginPollResult(DreamPortBrowserLoginStatus.NetworkError, Message: BuildNetworkError(res, "网络请求失败"));
+
+        if (res.Status == 404)
+            return new DreamPortBrowserLoginPollResult(DreamPortBrowserLoginStatus.NotFound, Message: ExtractMessage(res.Body, "登录授权会话不存在"));
+
+        if (res.Status != 200)
+            return new DreamPortBrowserLoginPollResult(DreamPortBrowserLoginStatus.NetworkError, Message: ExtractMessage(res.Body, $"查询授权状态失败（HTTP {res.Status}）"));
+
+        var data = UnwrapData(res.Body);
+        var status = ParseBrowserLoginStatus(GetString(data, "status"));
+        return new DreamPortBrowserLoginPollResult(
+            Status: status,
+            Username: GetString(data, "username"),
+            IsAdmin: GetBool(data, "isAdmin"));
+    }
+
+    /// <summary>
+    /// 通过 SSE（/api/qr-login/wait）阻塞等待状态变化事件；超时、EOF 或非取消网络错误返回 false，
+    /// 交由上层退避后继续轮询兜底。
+    /// </summary>
+    public async Task<bool> WaitBrowserLoginChangeAsync(
+        string qrToken,
+        TimeSpan maxWait,
+        CancellationToken ct = default)
+    {
+        var effectiveWait = maxWait <= TimeSpan.Zero
+            ? TimeSpan.FromSeconds(1)
+            : (maxWait > MaxSseWait ? MaxSseWait : maxWait);
+
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        linkedCts.CancelAfter(effectiveWait);
+
+        var path = "/api/qr-login/wait?token=" + Uri.EscapeDataString(qrToken);
+        using var req = CreateRequest(HttpMethod.Get, path, accept: "text/event-stream", auth: false);
+
+        try
+        {
+            using var resp = await _http.SendAsync(
+                req,
+                HttpCompletionOption.ResponseHeadersRead,
+                linkedCts.Token).ConfigureAwait(false);
+
+            if (!resp.IsSuccessStatusCode)
+                return false;
+
+            await using var stream = await resp.Content.ReadAsStreamAsync(linkedCts.Token).ConfigureAwait(false);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+
+            while (true)
+            {
+                var line = await reader.ReadLineAsync(linkedCts.Token).ConfigureAwait(false);
+                if (line is null)
+                    return false;
+
+                if (line.StartsWith("data:", StringComparison.Ordinal))
+                    return true;
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>单次消费已批准的授权会话并换取站点访问令牌（自动携带设备名与平台头）。</summary>
+    public async Task<DreamPortBrowserLoginConsumeResult> ConsumeBrowserLoginAsync(
+        string qrToken,
+        CancellationToken ct = default)
+    {
+        var path = "/api/qr-login/consume?token=" + Uri.EscapeDataString(qrToken);
+        var res = await SendAsync(HttpMethod.Post, path, auth: false, ct: ct).ConfigureAwait(false);
+
+        if (res.Status == 0)
+            return new DreamPortBrowserLoginConsumeResult(false, DreamPortBrowserLoginStatus.NetworkError, Message: BuildNetworkError(res, "获取登录凭据失败"));
+
+        if (res.Status == 404)
+            return new DreamPortBrowserLoginConsumeResult(false, DreamPortBrowserLoginStatus.NotFound, Message: ExtractMessage(res.Body, "登录授权会话不存在"));
+
+        if (res.Status != 200)
+            return new DreamPortBrowserLoginConsumeResult(false, DreamPortBrowserLoginStatus.NetworkError, Message: ExtractMessage(res.Body, $"获取登录凭据失败（HTTP {res.Status}）"));
+
+        var data = UnwrapData(res.Body);
+        var token = GetString(data, "token");
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            SetToken(token);
+            return new DreamPortBrowserLoginConsumeResult(
+                Ok: true,
+                Status: DreamPortBrowserLoginStatus.Approved,
+                Token: _token,
+                Username: GetString(data, "username"),
+                IsAdmin: GetBool(data, "isAdmin"));
+        }
+
+        var status = ParseBrowserLoginStatus(GetString(data, "status"));
+        return new DreamPortBrowserLoginConsumeResult(
+            Ok: false,
+            Status: status,
+            Message: ExtractMessage(res.Body, "尚未批准"));
     }
 
     public async Task<DreamPortRenewResult> RenewAsync(CancellationToken ct = default)
@@ -260,160 +351,12 @@ public sealed class DreamPortApiClient : IDisposable
             _http.Dispose();
     }
 
-    private DreamPortLoginResult ParseLoginResponse(
-        ApiResponse res,
-        string fallbackUsername,
-        string defaultError = "登录失败")
-    {
-        if (res.Status == 0)
-        {
-            return new DreamPortLoginResult
-            {
-                Outcome = DreamPortLoginOutcome.Error,
-                ErrorMessage = BuildNetworkError(res, "无法连接站点")
-            };
-        }
-
-        if (res.Status == 403)
-        {
-            var banData = UnwrapData(res.Body);
-            if (banData.ValueKind == JsonValueKind.Object && GetBool(banData, "banned"))
-            {
-                return new DreamPortLoginResult
-                {
-                    Outcome = DreamPortLoginOutcome.Banned,
-                    Username = GetString(banData, "username") ?? fallbackUsername,
-                    BanReason = GetString(banData, "reason") ?? "未提供理由",
-                    BanUntil = GetLong(banData, "banUntil"),
-                    Evidence = ParseEvidence(banData)
-                };
-            }
-
-            return new DreamPortLoginResult
-            {
-                Outcome = DreamPortLoginOutcome.Error,
-                ErrorMessage = ExtractMessage(res.Body, defaultError)
-            };
-        }
-
-        if (res.Status == 400)
-        {
-            var msg = ExtractMessage(res.Body, string.Empty);
-            if (msg.Contains("验证码", StringComparison.Ordinal))
-                return new DreamPortLoginResult { Outcome = DreamPortLoginOutcome.NeedCaptcha, ErrorMessage = msg };
-
-            return new DreamPortLoginResult
-            {
-                Outcome = DreamPortLoginOutcome.Error,
-                ErrorMessage = string.IsNullOrWhiteSpace(msg) ? "请求被拒绝" : msg
-            };
-        }
-
-        if (res.Status == 401)
-        {
-            return new DreamPortLoginResult
-            {
-                Outcome = DreamPortLoginOutcome.Error,
-                ErrorMessage = ExtractMessage(res.Body, "用户名或密码错误")
-            };
-        }
-
-        if (res.Status == 429)
-        {
-            return new DreamPortLoginResult
-            {
-                Outcome = DreamPortLoginOutcome.Error,
-                ErrorMessage = ExtractMessage(res.Body, "请求过于频繁，请稍后再试")
-            };
-        }
-
-        if (res.Status != 200)
-        {
-            return new DreamPortLoginResult
-            {
-                Outcome = DreamPortLoginOutcome.Error,
-                ErrorMessage = ExtractMessage(res.Body, $"{defaultError}（HTTP {res.Status}）")
-            };
-        }
-
-        var data = UnwrapData(res.Body);
-        var status = GetString(data, "status");
-        if (string.Equals(status, "needs_2fa", StringComparison.Ordinal))
-        {
-            return new DreamPortLoginResult
-            {
-                Outcome = DreamPortLoginOutcome.Need2Fa,
-                Username = GetString(data, "username") ?? fallbackUsername,
-                Status = status,
-                IsAdmin = GetBool(data, "isAdmin"),
-                ChallengeId = GetString(data, "challengeId") ?? string.Empty,
-                SupportsPasskey = GetBool(data, "passkey")
-            };
-        }
-
-        if (string.Equals(status, "needs_2fa_setup", StringComparison.Ordinal))
-        {
-            return new DreamPortLoginResult
-            {
-                Outcome = DreamPortLoginOutcome.Need2FaSetup,
-                Username = GetString(data, "username") ?? fallbackUsername,
-                Status = status,
-                IsAdmin = GetBool(data, "isAdmin"),
-                ChallengeId = GetString(data, "challengeId") ?? string.Empty,
-                ErrorMessage = "管理员账号需要先在网页端完成 2FA 绑定后才能登录"
-            };
-        }
-
-        var token = GetString(data, "token");
-        if (!string.IsNullOrWhiteSpace(token))
-        {
-            SetToken(token);
-            return new DreamPortLoginResult
-            {
-                Outcome = DreamPortLoginOutcome.Ok,
-                Token = _token,
-                Username = GetString(data, "username") ?? fallbackUsername,
-                Status = status ?? string.Empty,
-                IsAdmin = GetBool(data, "isAdmin")
-            };
-        }
-
-        return new DreamPortLoginResult
-        {
-            Outcome = DreamPortLoginOutcome.Error,
-            ErrorMessage = ExtractMessage(res.Body, "登录失败：响应缺少令牌")
-        };
-    }
-
-    private IReadOnlyList<DreamPortBanEvidence> ParseEvidence(JsonElement banData)
-    {
-        if (!banData.TryGetProperty("evidence", out var listEl) || listEl.ValueKind != JsonValueKind.Array)
-            return [];
-
-        var list = new List<DreamPortBanEvidence>();
-        foreach (var item in listEl.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object)
-                continue;
-
-            var relUrl = GetString(item, "fileUrl") ?? string.Empty;
-            var absUrl = ResolveAbsoluteUrl(relUrl);
-            list.Add(new DreamPortBanEvidence(
-                Id: GetString(item, "id") ?? string.Empty,
-                FileUrl: absUrl,
-                Note: GetString(item, "note"),
-                MediaType: GetString(item, "mediaType")));
-        }
-
-        return list;
-    }
-
     private string ResolveAbsoluteUrl(string url)
     {
         if (string.IsNullOrWhiteSpace(url))
             return string.Empty;
 
-        // Unix 平台下 "/uploads/..." 会被 Uri.TryCreate 识别为 file:// 绝对 URI，必须限定 http/https
+        // Unix 平台下 "/qr-login..." 会被 Uri.TryCreate 识别为 file:// 绝对 URI，必须限定 http/https
         if (Uri.TryCreate(url, UriKind.Absolute, out var existing)
             && (existing.Scheme == Uri.UriSchemeHttp || existing.Scheme == Uri.UriSchemeHttps))
         {
@@ -426,6 +369,26 @@ public sealed class DreamPortApiClient : IDisposable
                 : _baseUrl.TrimEnd('/') + "/" + url.TrimStart('/');
     }
 
+    private HttpRequestMessage CreateRequest(
+        HttpMethod method,
+        string path,
+        string accept,
+        bool auth)
+    {
+        var req = new HttpRequestMessage(method, _baseUrl + path);
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
+        req.Headers.TryAddWithoutValidation("User-Agent", DreamPortBuildConfig.UserAgent);
+        req.Headers.TryAddWithoutValidation("X-DreamPort-Surface", "desktop");
+        req.Headers.TryAddWithoutValidation("X-Device-Name", $"PCL-DreamPort ({SanitizeHeaderValue(Environment.MachineName)})");
+        req.Headers.TryAddWithoutValidation("X-Device-Platform", GetPlatformTag());
+        req.Headers.TryAddWithoutValidation("X-Client-Version", DreamPortBuildConfig.AppVersion);
+
+        if (auth && !string.IsNullOrEmpty(_token))
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+
+        return req;
+    }
+
     private async Task<ApiResponse> SendAsync(
         HttpMethod method,
         string path,
@@ -433,16 +396,7 @@ public sealed class DreamPortApiClient : IDisposable
         bool auth = true,
         CancellationToken ct = default)
     {
-        using var req = new HttpRequestMessage(method, _baseUrl + path);
-        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        req.Headers.TryAddWithoutValidation("User-Agent", DreamPortBuildConfig.UserAgent);
-        req.Headers.TryAddWithoutValidation("X-DreamPort-Surface", "desktop");
-        req.Headers.TryAddWithoutValidation("X-Device-Name", SanitizeHeaderValue(Environment.MachineName));
-        req.Headers.TryAddWithoutValidation("X-Device-Platform", GetPlatformTag());
-        req.Headers.TryAddWithoutValidation("X-Client-Version", DreamPortBuildConfig.AppVersion);
-
-        if (auth && !string.IsNullOrEmpty(_token))
-            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        using var req = CreateRequest(method, path, accept: "application/json", auth: auth);
 
         if (jsonBody is not null)
         {
@@ -465,6 +419,18 @@ public sealed class DreamPortApiClient : IDisposable
         {
             return new ApiResponse(0, null, null, ex.Message);
         }
+    }
+
+    private static DreamPortBrowserLoginStatus ParseBrowserLoginStatus(string? raw)
+    {
+        return raw?.Trim().ToLowerInvariant() switch
+        {
+            "approved" => DreamPortBrowserLoginStatus.Approved,
+            "denied" => DreamPortBrowserLoginStatus.Denied,
+            "expired" => DreamPortBrowserLoginStatus.Expired,
+            "consumed" => DreamPortBrowserLoginStatus.Consumed,
+            _ => DreamPortBrowserLoginStatus.Pending
+        };
     }
 
     private static JsonDocument? TryParseJson(string? raw)

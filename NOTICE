@@ -19,8 +19,8 @@ PCL Community Edition (PCL CE) 独立二次创作的衍生修改版，与龙腾�
    适用 Apache License 2.0（详见根目录 LICENSE）。
    主要修改内容（相比上游 PCL-Community/PCL-CE dev 基线）：
    - 新增 DreamPort.Core / DreamPort.UI / DreamPort.Test 模块；
-   - 接入自建梦港镜像源（dl.xmcraft.cn）与下载层 User-Agent 隔离；
-   - 接入 DreamPort 账号登录与 PCL 原生自定义主页原型；
+   - 隔离下载层 User-Agent，并保留梦港更新等配套服务加速地址配置（dl.xmcraft.cn）；游戏数据下载沿用 PCL 原生来源；
+   - 接入 DreamPort 浏览器确认登录原型（兼容手机扫码）与 PCL 原生自定义主页原型；
    - 仅保留微软正版游戏账号登录并增加设备码二维码展示；
    - 移除 Natayark ID 登录门控，保留 EasyTier 联机能力；
    - 禁用向上游 Sentry 的遥测上报与上游联机统计上报；
