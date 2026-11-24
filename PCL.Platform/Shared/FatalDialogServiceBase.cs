@@ -58,7 +58,7 @@ public abstract class FatalDialogServiceBase : IFatalDialogService
         {
             var path = Path.Combine(
                 Path.GetTempPath(),
-                $"PCL-CE-Crash-{DateTime.Now:yyyyMMdd-HHmmss}-{Environment.ProcessId}.txt");
+                $"PCL-DreamPort-Crash-{DateTime.Now:yyyyMMdd-HHmmss}-{Environment.ProcessId}.txt");
 
             File.WriteAllText(
                 path,
@@ -96,7 +96,7 @@ public abstract class FatalDialogServiceBase : IFatalDialogService
     {
         var path = Path.Combine(
             Path.GetTempPath(),
-            $"pcl-ce-crash-{Environment.ProcessId}-{Guid.NewGuid():N}.txt");
+            $"pcl-dreamport-crash-{Environment.ProcessId}-{Guid.NewGuid():N}.txt");
 
         try
         {

@@ -10,7 +10,7 @@ namespace PCL.UI.SystemIntegration;
 /// </summary>
 public static class LinuxDesktopEntry
 {
-    public const string AppId = "pcl-community-edition";
+    public const string AppId = "pcl-dreamport";
 
     public static void Ensure()
     {
@@ -41,8 +41,8 @@ public static class LinuxDesktopEntry
             var content = new StringBuilder()
                 .AppendLine("[Desktop Entry]")
                 .AppendLine("Type=Application")
-                .AppendLine("Name=PCL Community Edition")
-                .AppendLine("Comment=Plain Craft Launcher Community Edition")
+                .AppendLine("Name=PCL-梦港")
+                .AppendLine("Comment=PCL-梦港 Minecraft Launcher")
                 .AppendLine($"Exec={QuoteDesktopArg(executable)}")
                 .AppendLine($"Icon={EscapeDesktopValue(iconPath)}")
                 .AppendLine($"StartupWMClass={AppId}")

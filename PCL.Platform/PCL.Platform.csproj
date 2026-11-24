@@ -2,10 +2,10 @@
     <PropertyGroup>
         <AssemblyTitle>PCL.Platform</AssemblyTitle>
         <AssemblyName>PCL.Platform</AssemblyName>
-        <Description>PCL CE 平台原生实现</Description>
-        <Company>PCL Community</Company>
+        <Description>PCL-梦港 平台原生实现</Description>
+        <Company>DreamPort Contributors</Company>
         <Product>PCL.Platform</Product>
-        <Copyright>Copyright © PCL Community</Copyright>
+        <Copyright>Copyright © PCL Community &amp; DreamPort Contributors</Copyright>
         <RootNamespace>PCL.Platform</RootNamespace>
         <TargetFramework>net10.0</TargetFramework>
         <LangVersion>15.0</LangVersion>

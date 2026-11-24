@@ -94,7 +94,7 @@
                                                FontSize="42"
                                                FontWeight="Bold"
                                                Foreground="{DynamicResource ColorBrush1}"
-                                               Text="PCL CE"
+                                               Text="PCL-梦港"
                                                TextWrapping="Wrap" />
                                     <TextBlock FontSize="22"
                                                FontWeight="Bold"
@@ -133,6 +133,7 @@
                         <ui:MyIconTextButton x:Name="BtnTranslateWebsite"
                                              Margin="0,0,7,0"
                                              ColorType="Highlight"
+                                             IsVisible="False"
                                              SvgIcon="lucide/globe"
                                              Text="{loc:Loc Setup.Language.Banner.TranslateWebsite}" />
                         <ui:MyIconTextButton x:Name="BtnSubmitPullRequest"

@@ -12,18 +12,9 @@ public static class UpdateManager
 {
     public static bool isUpdateWaitingRestart;
 
-    public static UpdatesWrapperModel remoteServer = new(
-        new List<IUpdateSource>
-        {
-            new UpdatesMirrorChyanModel(),
-            new UpdatesRandomModel(
-            [
-                new UpdatesMinioModel("https://s3.pysio.online/pcl2-ce/", "Pysio")
-            ]),
-            new UpdatesMinioModel(
-                "https://github.com/PCL-Community/PCL2_CE_Server/raw/main/",
-                "GitHub")
-        });
+    public static UpdatesWrapperModel remoteServer = new([]);
+
+    public static bool HasConfiguredUpdateSource => remoteServer.IsAvailable();
 
     public static Loading.LoaderCombo<JsonObject> updateLoader;
 
@@ -47,6 +38,9 @@ public static class UpdateManager
 
     public static UpdateEnums.VersionStatus GetVersionStatus()
     {
+        if (!HasConfiguredUpdateSource)
+            return UpdateEnums.VersionStatus.Latest;
+
         try
         {
             if (!IsCurrentVersionBeta || Config.Update.UpdateChannel == UpdateChannel.Beta)
@@ -97,6 +91,15 @@ public static class UpdateManager
         string? receivedKey = null,
         bool forceValidated = false)
     {
+        if (!HasConfiguredUpdateSource)
+        {
+            LauncherCommon.Log("[Update] 未配置 PCL-梦港 远程更新源，已跳过应用内更新");
+            if (type != UpdateEnums.UpdateType.Silent)
+                LauncherCommon.RunInUi(() => UpdateUi.Current?.ShowHint(
+                    Lang.Text("Setup.Update.NoRemoteSource")));
+            return;
+        }
+
         if (!SupportsInAppUpdate && type != UpdateEnums.UpdateType.PromptOnly)
         {
             LauncherCommon.Log("[Update] 当前平台不支持应用内安装，已改为手动下载");
@@ -108,7 +111,7 @@ public static class UpdateManager
         var dlTargetPath = Path.Combine(
             LauncherPaths.ExecutableDirectory,
             "PCL",
-            "Plain Craft Launcher Community Edition.exe");
+            "PCL-DreamPort.exe");
         LauncherCommon.RunInNewThread(() =>
         {
             try
@@ -118,7 +121,7 @@ public static class UpdateManager
                     SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64
                 );
 
-                Files.WriteAllText($"{LauncherPaths.Temp}CEUpdateLog.md", version.Changelog);
+                Files.WriteAllText($"{LauncherPaths.Temp}DreamPortUpdateLog.md", version.Changelog);
                 LauncherCommon.Log(
                     $"[Update] 远程最新版本: {version.VersionName}, 当前版本: {LauncherCommon.VersionBaseName}");
                 if (!(SemVer.Parse(version.VersionName)
@@ -248,7 +251,7 @@ public static class UpdateManager
             var fileName = Path.Combine(
                 LauncherPaths.ExecutableDirectory,
                 "PCL",
-                "Plain Craft Launcher Community Edition.exe");
+                "PCL-DreamPort.exe");
             if (!File.Exists(fileName))
             {
                 LauncherCommon.Log("[System] 更新失败：未找到更新文件");
@@ -288,8 +291,11 @@ public static class UpdateManager
     /// <summary>确保 PathTemp 下的 Latest.exe 是最新正式版的 PCL，它会被用于整合包打包。 如果不是，则下载一个。</summary>
     internal static void DownloadLatestPcl(Loading.LoaderBase? loaderToSyncProgress = null)
     {
+        if (!HasConfiguredUpdateSource)
+            throw new Exception(Lang.Text("Setup.Update.NoRemoteSource"));
+
         // 注意：如果要自行实现这个功能，请换用另一个文件路径，以免与官方版本冲突
-        var latestPclPath = Path.Combine(LauncherPaths.Temp, "CE-Latest.exe");
+        var latestPclPath = Path.Combine(LauncherPaths.Temp, "DreamPort-Latest.exe");
         var target = remoteServer.GetLatestVersion(
             UpdateSourceChannel.Stable,
             SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64);
@@ -298,7 +304,7 @@ public static class UpdateManager
         if (File.Exists(latestPclPath)
             && (Files.GetFileSha256(latestPclPath) ?? "") == (target.Sha256 ?? ""))
         {
-            LauncherCommon.Log("[System] 最新版 PCL CE 已存在，跳过下载");
+            LauncherCommon.Log("[System] 最新版 PCL-梦港 已存在，跳过下载");
             return;
         }
 
@@ -330,6 +336,12 @@ public static class UpdateManager
 
     private static void ScheduleBasedOnConfig()
     {
+        if (!HasConfiguredUpdateSource)
+        {
+            LauncherCommon.Log("[Update] 未配置 PCL-梦港 远程更新源，跳过自动检查更新");
+            return;
+        }
+
         if (!SupportsInAppUpdate)
         {
             if (Config.Update.UpdateMode == LauncherAutoUpdateBehavior.Disable)

@@ -22,7 +22,7 @@ using PCL.Xaml;
 namespace PCL.Views.Pages.Launch;
 
 /// <summary>
-/// 启动页右栏：按 <c>Preference.Homepage</c> 配置构建主页内容，另带社区版提示与启动日志卡片。
+/// 启动页右栏：按 <c>Preference.Homepage</c> 配置构建主页内容，另带使用说明与启动日志卡片。
 /// 主页来源分为空白、内置“你知道吗”、Minecraft 信息流与运行时 XAML 主页四类； 运行时内容支持旧 WPF XAML 与 AXAML
 /// 两种格式，统一走预设、本地文件、URL、 缓存与 CustomLive.json 实时补丁流程。
 /// </summary>
@@ -176,7 +176,7 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
             }
             catch (Exception ex)
             {
-                LogWrapper.Error(ex, "Launch", "加载 PCL CE 主页自定义信息失败");
+                LogWrapper.Error(ex, "Launch", "加载 PCL-梦港 主页自定义信息失败");
                 content = new HomepageContent
                 {
                     Kind = HomepageSourceKind.Blank,
@@ -226,41 +226,20 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
         HintService.Show(Hints.Info(Lang.Text("Launch.Homepage.Loading")));
     }
 
-    private async void HideCommunityHint()
+    private void HideCommunityHint()
     {
         if (_communityHintDialogOpen)
             return;
 
         _communityHintDialogOpen = true;
-        var closeButton = this.FindControl<MyIconButton>("BtnHintClose");
-        closeButton?.IsEnabled = false;
         try
         {
-            var result = await DialogService.Instance.ShowAsync(
-                new InputDialogRequest
-                {
-                    Title = Lang.Text("Launch.Right.CommunityHint.InputTitle"),
-                    Buttons = DialogButtons.OkCancel,
-                    HighLight = false
-                });
-            var input = result.InputText ?? "";
-            if (string.IsNullOrWhiteSpace(input))
-                return;
-
-            input = new string(input.Where(char.IsAsciiLetter).ToArray()).ToLowerInvariant();
-            if (!input.Contains("pclcommunity"))
-            {
-                HintService.Show(Hints.Info(Lang.Text("Launch.Right.CommunityHint.WrongInput")));
-                return;
-            }
-
             AnimationService.DisposeControl(_panHint, true);
             States.Hint.CEMessage = false;
         }
         finally
         {
             _communityHintDialogOpen = false;
-            closeButton?.IsEnabled = true;
         }
     }
 

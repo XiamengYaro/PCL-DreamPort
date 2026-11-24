@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=PCL-梦港
+Comment=PCL-梦港 Minecraft Launcher
+Exec=AppRun %U
+Icon=pcl-dreamport
+Terminal=false
+Categories=Game;Utility;
+StartupWMClass=pcl-dreamport
+StartupNotify=true

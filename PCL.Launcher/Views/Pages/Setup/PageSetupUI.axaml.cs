@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.VisualTree;
+using DreamPort.Core.Config;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
@@ -380,7 +381,7 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
             CustomEventService.SetEventData(
                 HintCustom,
                 type == 2
-                    ? "https://github.com/PCL-Community/PCL-CE/discussions"
+                    ? $"{DreamPortBuildConfig.RepoUrl}/discussions"
                     : "");
         }
 

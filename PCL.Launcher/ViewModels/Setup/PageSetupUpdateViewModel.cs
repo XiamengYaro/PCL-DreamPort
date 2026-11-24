@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using DreamPort.Core.Config;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Dialogs;
@@ -35,9 +36,6 @@ public partial class PageSetupUpdateViewModel : ViewModelBase
     [ObservableProperty] public partial bool CheckAgainEnabled { get; set; } = true;
 
     [ObservableProperty] public partial string CurrentVersionText { get; set; } = string.Empty;
-
-    [ObservableProperty]
-    public partial string MirrorChyanKey { get; set; } = Config.Update.MirrorChyanKey;
 
     [ObservableProperty] public partial bool ShowCheckCard { get; set; }
 
@@ -87,11 +85,6 @@ public partial class PageSetupUpdateViewModel : ViewModelBase
                 ? UpdateButtonState.Install
                 : UpdateButtonState.OpenDownload;
 
-    partial void OnMirrorChyanKeyChanged(string value)
-    {
-        Config.Update.MirrorChyanKey = value ?? string.Empty;
-    }
-
     partial void OnShowUpdateCardChanged(bool value)
     {
         OnPropertyChanged(nameof(ChangelogText));
@@ -104,8 +97,8 @@ public partial class PageSetupUpdateViewModel : ViewModelBase
 
     public void Reload()
     {
-        CurrentVersionText = "PCL CE " + VersionNameFormat(LauncherCommon.VersionBaseName);
-        MirrorChyanKey = Config.Update.MirrorChyanKey;
+        CurrentVersionText = $"{DreamPortBuildConfig.DisplayName} "
+            + VersionNameFormat(LauncherCommon.VersionBaseName);
         UpdateModeIndex = Math.Clamp((int)Config.Update.UpdateMode, 0, 3);
         SetUpdateButtonState(InstallButtonState);
         UpdateButtonEnabled = !IsFlatpak;
@@ -121,6 +114,12 @@ public partial class PageSetupUpdateViewModel : ViewModelBase
         CheckAgainEnabled = false;
         try
         {
+            if (!UpdateManager.HasConfiguredUpdateSource)
+            {
+                SetStatusText("Setup.Update.NoRemoteSource");
+                return;
+            }
+
             var channel = UpdateManager.IsCurrentVersionBeta
                 ? UpdateSourceChannel.Beta
                 : UpdateSourceChannel.Stable;
@@ -139,7 +138,8 @@ public partial class PageSetupUpdateViewModel : ViewModelBase
             var version = await Task.Run(() =>
                 UpdateManager.remoteServer.GetLatestVersion(channel, arch));
             _latestVersion = version;
-            UpdateNameText = "PCL CE " + VersionNameFormat(version.VersionName);
+            UpdateNameText = $"{DreamPortBuildConfig.DisplayName} "
+                + VersionNameFormat(version.VersionName);
             _changelogSummary = ExtractSummary(version.Changelog);
             OnPropertyChanged(nameof(ChangelogText));
 
@@ -292,9 +292,7 @@ public partial class PageSetupUpdateViewModel : ViewModelBase
 
     public static void OpenReleasesPage()
     {
-        Basics.OpenPath(
-            "https://github.com/PCL-Community/PCL2-CE/releases/v"
-            + LauncherCommon.VersionBaseName);
+        Basics.OpenPath($"{DreamPortBuildConfig.RepoUrl}/releases");
     }
 
     /// <summary>切换更新通道；返回 false 表示用户取消，调用方需要把下拉恢复原值。</summary>

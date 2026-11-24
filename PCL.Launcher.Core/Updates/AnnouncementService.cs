@@ -10,6 +10,12 @@ public static class AnnouncementService
         if (States.System.AnnounceSolution > 1)
             return;
 
+        if (!UpdateManager.HasConfiguredUpdateSource)
+        {
+            LauncherCommon.Log("[System] 未配置启动器公告源，跳过远程公告检查");
+            return;
+        }
+
         var showedAnnounced = States
             .Hint.ShowedAnnouncements
             .Split("|".ToCharArray(), StringSplitOptions.RemoveEmptyEntries)

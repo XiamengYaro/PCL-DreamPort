@@ -35,7 +35,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DOTNET="${DOTNET:-dotnet}"
 OUT="$(mkdir -p "$OUT" && cd "$OUT" && pwd)"
 PUBLISH="$OUT/$RID"
-ASSET_PREFIX="PCL2_CE_${CONFIG}_linux_${ASSET_ARCH}"
+ASSET_PREFIX="PCL_DreamPort_${CONFIG}_linux_${ASSET_ARCH}"
 NFPM="${NFPM:-nfpm}"
 APPIMAGETOOL="${APPIMAGETOOL:-}"
 APPIMAGE_RUNTIME="${APPIMAGE_RUNTIME:-}"
@@ -66,17 +66,17 @@ fi
 
 APPDIR="$OUT/.AppDir-$RID"
 rm -rf "$APPDIR"
-mkdir -p "$APPDIR/usr/lib/pcl-ce"
-cp -a "$PUBLISH"/. "$APPDIR/usr/lib/pcl-ce/"
-normalize_app_tree "$APPDIR/usr/lib/pcl-ce"
+mkdir -p "$APPDIR/usr/lib/pcl-dreamport"
+cp -a "$PUBLISH"/. "$APPDIR/usr/lib/pcl-dreamport/"
+normalize_app_tree "$APPDIR/usr/lib/pcl-dreamport"
 cp "$ROOT/scripts/linux/AppRun" "$APPDIR/AppRun"
-cp "$ROOT/scripts/linux/pcl-community-edition-appimage.desktop" \
-  "$APPDIR/pcl-community-edition.desktop"
+cp "$ROOT/scripts/linux/pcl-dreamport-appimage.desktop" \
+  "$APPDIR/pcl-dreamport.desktop"
 cp "$ROOT/PCL.Launcher/Assets/Images/icon.png" \
-  "$APPDIR/pcl-community-edition.png"
-ln -sf pcl-community-edition.png "$APPDIR/.DirIcon"
+  "$APPDIR/pcl-dreamport.png"
+ln -sf pcl-dreamport.png "$APPDIR/.DirIcon"
 chmod 0755 "$APPDIR/AppRun"
-grep -q '^Exec=AppRun %U$' "$APPDIR/pcl-community-edition.desktop" \
+grep -q '^Exec=AppRun %U$' "$APPDIR/pcl-dreamport.desktop" \
   || fail "AppImage desktop entry does not point to AppRun"
 
 APPIMAGE_PATH="$OUT/${ASSET_PREFIX}.AppImage"
@@ -96,7 +96,7 @@ if ! (cd "$APPIMAGE_CHECK" && "$APPIMAGE_PATH" --appimage-extract >/dev/null 2>&
   rm -rf "$APPIMAGE_CHECK"
   fail "failed to extract AppImage for verification"
 fi
-grep -q '^Exec=AppRun %U$' "$APPIMAGE_CHECK/squashfs-root/pcl-community-edition.desktop" \
+grep -q '^Exec=AppRun %U$' "$APPIMAGE_CHECK/squashfs-root/pcl-dreamport.desktop" \
   || { rm -rf "$APPIMAGE_CHECK"; fail "packaged desktop entry does not point to AppRun"; }
 [ -x "$APPIMAGE_CHECK/squashfs-root/AppRun" ] \
   || { rm -rf "$APPIMAGE_CHECK"; fail "packaged AppRun is missing or not executable"; }
@@ -135,7 +135,7 @@ make_nfpm_config() {
   fi
 
   cat > "$config" <<EOF
-name: pcl-ce
+name: pcl-dreamport
 arch: $PKG_ARCH
 platform: linux
 version: "$VERSION"
@@ -143,37 +143,45 @@ version_schema: semver
 release: 1
 section: games
 priority: optional
-maintainer: PCL Community <pcl-community@users.noreply.github.com>
-description: PCL Community Edition Minecraft launcher
-vendor: PCL Community
-homepage: https://github.com/PCL-Community/PCL-CE
-license: MIT
+maintainer: DreamPort Contributors
+description: PCL-梦港 Minecraft launcher
+vendor: DreamPort
+homepage: https://github.com/Xiameng/PCL-DreamPort
+license: Apache-2.0
 depends:
 $depends
 recommends:
   - dotnet-runtime-10.0
 contents:
   - src: "$stage/"
-    dst: /opt/pcl-ce
+    dst: /opt/pcl-dreamport
     type: tree
-  - src: "$ROOT/scripts/linux/pcl-ce-wrapper"
-    dst: /usr/bin/pcl-ce
+  - src: "$ROOT/scripts/linux/pcl-dreamport-wrapper"
+    dst: /usr/bin/pcl-dreamport
     file_info:
       mode: 0755
-  - src: "$ROOT/scripts/linux/pcl-community-edition.desktop"
-    dst: /usr/share/applications/pcl-community-edition.desktop
+  - src: "$ROOT/scripts/linux/pcl-dreamport.desktop"
+    dst: /usr/share/applications/pcl-dreamport.desktop
     file_info:
       mode: 0644
   - src: "$ROOT/PCL.Launcher/Assets/Images/icon.png"
-    dst: /usr/share/icons/hicolor/256x256/apps/pcl-community-edition.png
+    dst: /usr/share/icons/hicolor/256x256/apps/pcl-dreamport.png
     file_info:
       mode: 0644
   - src: "$ROOT/LICENSE"
-    dst: /usr/share/doc/pcl-ce/LICENSE
+    dst: /usr/share/doc/pcl-dreamport/LICENSE
+    file_info:
+      mode: 0644
+  - src: "$ROOT/NOTICE"
+    dst: /usr/share/doc/pcl-dreamport/NOTICE
+    file_info:
+      mode: 0644
+  - src: "$ROOT/PCL.Launcher/LICENCE"
+    dst: /usr/share/doc/pcl-dreamport/LICENCE.PCL.Launcher
     file_info:
       mode: 0644
   - src: "$ROOT/PCL.Launcher.Core/LICENCE"
-    dst: /usr/share/doc/pcl-ce/LICENCE.PCL.Launcher.Core
+    dst: /usr/share/doc/pcl-dreamport/LICENCE.PCL.Launcher.Core
     file_info:
       mode: 0644
 scripts:

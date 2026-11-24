@@ -5,8 +5,8 @@ set -eu
 HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 export PCL_PACKAGE_KIND=appimage
-export PCL_DATA_DIR="${PCL_DATA_DIR:-$HOME/PCLCE}"
-export PCL_MINECRAFT_DIR="${PCL_MINECRAFT_DIR:-$HOME/PCLCE/.minecraft}"
-export RESOURCE_NAME="${RESOURCE_NAME:-pcl-community-edition}"
+export PCL_DATA_DIR="${PCL_DATA_DIR:-$HOME/PCL-DreamPort}"
+export PCL_MINECRAFT_DIR="${PCL_MINECRAFT_DIR:-$HOME/PCL-DreamPort/.minecraft}"
+export RESOURCE_NAME="${RESOURCE_NAME:-pcl-dreamport}"
 
-exec "$HERE/usr/lib/pcl-ce/PCL.Launcher" "$@"
+exec "$HERE/usr/lib/pcl-dreamport/PCL.Launcher" "$@"

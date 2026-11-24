@@ -77,7 +77,7 @@ public static class LauncherPaths
             return _WithTrailingSeparator(
                 Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    "PCLCE"));
+                    "PCL-DreamPort"));
 
         return ExecutableDirectory;
     }
@@ -99,7 +99,7 @@ public static class LauncherPaths
         if (!string.IsNullOrWhiteSpace(Paths.PackageKind))
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "PCLCE",
+                "PCL-DreamPort",
                 ".minecraft");
 
         return Path.TrimEndingDirectorySeparator(

@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using PCL;
 using PCL.Core.App;
 
 namespace DreamPort.Test;
@@ -77,19 +78,39 @@ public sealed class LicenseComplianceTests
         var root = FindRepoRoot();
         var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            ".cs", ".axaml", ".xaml", ".csproj", ".md", ".sh", ".json", ".txt"
+            ".cs", ".axaml", ".xaml", ".csproj", ".md", ".sh", ".json", ".txt", ".yml", ".yaml", ".desktop", ".toml"
         };
 
         var filesToScan = new List<string>
         {
             Path.Combine(root, "README.md"),
+            Path.Combine(root, "README-EN.md"),
+            Path.Combine(root, "README-ZH_TW.md"),
+            Path.Combine(root, "CONTRIBUTING.md"),
+            Path.Combine(root, "cliff.toml"),
             Path.Combine(root, "NOTICE"),
+            Path.Combine(root, "scripts", "package-linux.sh"),
+            Path.Combine(root, "scripts", "package-macos.sh"),
+            Path.Combine(root, "scripts", "linux", "AppRun"),
+            Path.Combine(root, "scripts", "linux", "pcl-dreamport-wrapper"),
+            Path.Combine(root, "scripts", "linux", "pcl-dreamport.desktop"),
+            Path.Combine(root, "scripts", "linux", "pcl-dreamport-appimage.desktop"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortAccount.axaml"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortAccount.axaml.cs"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsGameLink.axaml"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsGameLink.axaml.cs"),
             Path.Combine(root, "PCL.Launcher", "ViewModels", "Pages", "PageToolsGameLinkViewModel.cs")
         };
+
+        var githubDir = Path.Combine(root, ".github");
+        if (Directory.Exists(githubDir))
+        {
+            foreach (var file in Directory.EnumerateFiles(githubDir, "*", SearchOption.AllDirectories))
+            {
+                if (extensions.Contains(Path.GetExtension(file)))
+                    filesToScan.Add(file);
+            }
+        }
 
         foreach (var dirName in new[] { "DreamPort.Core", "DreamPort.UI", "DreamPort.Test" })
         {
@@ -152,6 +173,73 @@ public sealed class LicenseComplianceTests
                 }
             }
         }
+    }
+
+    [TestMethod]
+    public void NoUpstreamCeEndpointsOrMirrorChyanLeftInLauncherCode()
+    {
+        var root = FindRepoRoot();
+
+        Assert.IsFalse(
+            File.Exists(Path.Combine(root, "PCL.Launcher.Core", "Updates", "UpdatesMirrorChyanModel.cs")),
+            "应已移除上游 UpdatesMirrorChyanModel.cs");
+
+        var targetFiles = new[]
+        {
+            Path.Combine(root, "PCL.Launcher.Core", "Updates", "UpdateManager.cs"),
+            Path.Combine(root, "PCL.Launcher.Core", "Updates", "AnnouncementService.cs"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Setup", "PageSetupUpdate.axaml"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Setup", "PageSetupUpdate.axaml.cs"),
+            Path.Combine(root, "PCL.Launcher", "ViewModels", "Setup", "PageSetupUpdateViewModel.cs"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Setup", "PageSetupFeedback.axaml.cs"),
+            Path.Combine(root, "PCL.Launcher", "ViewModels", "Setup", "PageSetupFeedbackViewModel.cs"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Launch", "PageLaunchRight.axaml.cs"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Homepage", "HomepagePresetTable.cs"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Setup", "PageSetupUI.axaml.cs"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Setup", "PageSetupLauncherLanguage.axaml.cs"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Shell", "StartupEffects.cs"),
+            Path.Combine(root, "PCL.Core", "App", "Essentials", "BuildProvenance.cs"),
+            Path.Combine(root, "PCL.Core", "IO", "Net", "Http", "HttpSenderExtension.cs"),
+            Path.Combine(root, "PCL.Core", "IO", "Net", "Dns", "DnsQuery.cs")
+        };
+
+        var forbiddenTokens = new[]
+        {
+            "PCL2_CE_Server",
+            "mirrorchyan.com",
+            "s3.pysio.online/pcl2-ce",
+            "www.pclc.cc/img/pcl-ce",
+            "translate.pclc.cc",
+            "doh.pysio.online",
+            "PCL-Community/PCL2-CE/issues",
+            "PCL-Community/PCL2-CE/releases",
+            "pclcommunity"
+        };
+
+        foreach (var file in targetFiles)
+        {
+            Assert.IsTrue(File.Exists(file), $"缺少检查文件：{file}");
+            var content = File.ReadAllText(file, Encoding.UTF8);
+            foreach (var token in forbiddenTokens)
+            {
+                Assert.IsFalse(
+                    content.Contains(token, StringComparison.OrdinalIgnoreCase),
+                    $"文件 {Path.GetRelativePath(root, file)} 仍残留上游标识：{token}");
+            }
+        }
+
+        Assert.IsFalse(UpdateManager.HasConfiguredUpdateSource);
+        Assert.AreEqual(UpdateEnums.VersionStatus.Latest, UpdateManager.GetVersionStatus());
+
+        Assert.AreEqual(
+            "https://api.github.com/repos/Xiameng/PCL-DreamPort/issues?state=all&sort=created&per_page=200",
+            PageSetupFeedbackViewModel.BuildIssuesApiUrl("https://github.com/Xiameng/PCL-DreamPort"));
+        Assert.AreEqual(
+            "https://api.github.com/repos/Owner/CustomRepo/issues?state=all&sort=created&per_page=200",
+            PageSetupFeedbackViewModel.BuildIssuesApiUrl("https://github.com/Owner/CustomRepo.git/"));
+        Assert.AreEqual(
+            "https://api.github.com/repos/Xiameng/PCL-DreamPort/issues?state=all&sort=created&per_page=200",
+            PageSetupFeedbackViewModel.BuildIssuesApiUrl("https://git.xmcraft.cn/Xiameng/PCL-DreamPort"));
     }
 
     internal static bool ContainsColorEmoji(string text, out string offense)

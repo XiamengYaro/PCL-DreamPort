@@ -1,7 +1,11 @@
 using System.Collections.ObjectModel;
+using System.Net;
+using System.Net.Http;
 using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DreamPort.Core.Config;
 using PCL.Core.App.Localization;
+using PCL.Core.IO.Net.Http;
 using PCL.Core.ViewModel;
 using PCL.Network;
 
@@ -81,15 +85,46 @@ public partial class PageSetupFeedbackViewModel : ViewModelBase
                 [((long)TagId.Duplicate).ToString()] = (DuplicateRows, "Blocks/CobbleStone.png")
             };
 
+    public static string BuildIssuesApiUrl(string repoUrl)
+    {
+        if (Uri.TryCreate(repoUrl, UriKind.Absolute, out var uri)
+            && string.Equals(uri.Host, "github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            var segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length >= 2)
+            {
+                var owner = segments[0];
+                var repo = segments[1].EndsWith(".git", StringComparison.OrdinalIgnoreCase)
+                    ? segments[1][..^4]
+                    : segments[1];
+                if (!string.IsNullOrWhiteSpace(owner) && !string.IsNullOrWhiteSpace(repo))
+                    return $"https://api.github.com/repos/{owner}/{repo}/issues?state=all&sort=created&per_page=200";
+            }
+        }
+
+        return "https://api.github.com/repos/Xiameng/PCL-DreamPort/issues?state=all&sort=created&per_page=200";
+    }
+
     public static List<FeedbackItem> FetchFeedbackList()
     {
-        var json = Requester.FetchJson(
-            "https://api.github.com/repos/PCL-Community/PCL2-CE/issues?state=all&sort=created&per_page=200",
-            new RequestParam
-            {
-                Retries = 3,
-                UseBrowserUserAgent = true
-            });
+        JsonNode json;
+        try
+        {
+            json = Requester.FetchJson(
+                BuildIssuesApiUrl(DreamPortBuildConfig.RepoUrl),
+                new RequestParam
+                {
+                    Retries = 2,
+                    UseBrowserUserAgent = true
+                });
+        }
+        catch (HttpRequestException ex) when (
+            ex.StatusCode == HttpStatusCode.NotFound
+            || (ex is HttpResponseException resp && resp.Response?.StatusCode == HttpStatusCode.NotFound))
+        {
+            return [];
+        }
+
         if (json is not JsonArray list)
             throw new InvalidOperationException(Lang.Text("Setup.Feedback.LoadFailed"));
 

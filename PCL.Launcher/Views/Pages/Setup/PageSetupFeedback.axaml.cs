@@ -1,4 +1,5 @@
 using Avalonia.Input;
+using DreamPort.Core.Config;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Dialogs;
@@ -13,7 +14,7 @@ namespace PCL.Views.Pages.Setup;
 /// </summary>
 public partial class PageSetupFeedback : MyPageRight, IRefreshable
 {
-    private const string IssuesUrl = "https://github.com/PCL-Community/PCL2-CE/issues";
+    private static string IssuesUrl => $"{DreamPortBuildConfig.RepoUrl}/issues";
 
     private readonly Loading.LoaderTask<bool, List<FeedbackItem>> _loader;
     private bool _loaded;

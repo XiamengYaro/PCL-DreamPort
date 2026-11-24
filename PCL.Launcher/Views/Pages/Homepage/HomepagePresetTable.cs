@@ -104,8 +104,8 @@ public static class HomepagePresetTable
         new(
             14,
             "Setup.Ui.Homepage.Preset.PclAnnouncement",
-            HomepageSourceKind.CustomXaml,
-            "https://s3.pysio.online/pcl2-ce/apiv2/pages/announce.xaml"),
+            HomepageSourceKind.Removed,
+            null),
         new(15, "Setup.Ui.Homepage.Preset.McOfficialFeed", HomepageSourceKind.NewsFeed, null)
     ];
 

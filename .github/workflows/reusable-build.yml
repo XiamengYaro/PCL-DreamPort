@@ -42,7 +42,7 @@ jobs:
       RID: ${{ inputs.rid }}
       PLATFORM: ${{ inputs.platform }}
       VERSION: ${{ inputs.version }}
-      ASSET_NAME: PCL2_CE_${{ inputs.configuration }}_${{ inputs.target }}
+      ASSET_NAME: PCL_DreamPort_${{ inputs.configuration }}_${{ inputs.target }}
 
     steps:
       - name: Checkout
@@ -66,10 +66,6 @@ jobs:
           PCL_MS_CLIENT_ID: ${{ inputs.include_secrets && secrets.CLIENT_ID || '' }}
           PCL_CURSEFORGE_API_KEY: ${{ inputs.include_secrets && secrets.CURSEFORGE_API_KEY || '' }}
           PCL_SENTRY_DSN: ${{ inputs.include_secrets && secrets.SENTRY_DSN || '' }}
-          PCL_NAID_CLIENT_ID: ${{ inputs.include_secrets && secrets.NAID_CLIENT_ID || '' }}
-          PCL_NAID_CLIENT_SECRET: ${{ inputs.include_secrets && secrets.NAID_CLIENT_SECRET || '' }}
-          PCL_LINK_SERVER_ROOT: ${{ inputs.include_secrets && secrets.LINK_SERVER_ROOTS || '' }}
-          PCL_LOBBY_DEFAULT_SECRET: ${{ inputs.include_secrets && secrets.LOBBY_DEFAULT_SECRET || '' }}
           PCL_GITHUB_SHA: ${{ github.sha }}
           CODESIGN_IDENTITY: ${{ inputs.include_secrets && runner.os == 'macOS' && secrets.APPLE_CODESIGN_IDENTITY || '' }}
           APPLE_ID: ${{ inputs.include_secrets && runner.os == 'macOS' && secrets.APPLE_ID || '' }}
@@ -118,20 +114,20 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          ditto -c -k --sequesterRsrc --keepParent "dist/PCL CE.app" "dist/${ASSET_NAME}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "dist/PCL-梦港.app" "dist/${ASSET_NAME}.zip"
           DMG_ROOT="dist/.dmg-root-${RID}"
           rm -rf "$DMG_ROOT"
           mkdir -p "$DMG_ROOT"
-          cp -a "dist/PCL CE.app" "$DMG_ROOT/"
+          cp -a "dist/PCL-梦港.app" "$DMG_ROOT/"
           ln -s /Applications "$DMG_ROOT/Applications"
-          hdiutil create -volname "PCL CE" -srcfolder "$DMG_ROOT" \
+          hdiutil create -volname "PCL-梦港" -srcfolder "$DMG_ROOT" \
             -ov -format UDZO "dist/${ASSET_NAME}.dmg"
           rm -rf "$DMG_ROOT"
 
       - name: Upload the Build Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: PCL2_CE_${{ inputs.configuration }}_${{ inputs.target }}
+          name: PCL_DreamPort_${{ inputs.configuration }}_${{ inputs.target }}
           path: |
             dist/*.zip
             dist/*.dmg

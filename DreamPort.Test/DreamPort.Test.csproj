@@ -26,4 +26,9 @@
         <ProjectReference Include="..\PCL.Launcher.Core\PCL.Launcher.Core.csproj" />
         <ProjectReference Include="..\PCL.Launcher\PCL.Launcher.csproj" />
     </ItemGroup>
+    <ItemGroup>
+        <EmbeddedResource Include="..\PCL.Launcher\Resources\metadata.json" Link="metadata.json">
+            <LogicalName>PCL.metadata.json</LogicalName>
+        </EmbeddedResource>
+    </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using DreamPort.Core.Config;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
@@ -345,7 +346,7 @@ public class CustomEvent
         if (!Uri.TryCreate(args[0], UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            LauncherUi.Interaction?.OpenWebsite("https://docs.pclc.cc/ce");
+            LauncherUi.Interaction?.OpenWebsite(DreamPortBuildConfig.RepoUrl);
             return;
         }
 

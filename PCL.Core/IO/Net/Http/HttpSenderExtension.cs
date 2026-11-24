@@ -23,11 +23,10 @@ public static class HttpSenderExtension
             using var request = requestMessage;
             httpClient ??= NetworkService.GetClient();
 
-            if(addMetedata)
+            if (addMetedata)
             {
                 request
-                    .WithHeader("User-Agent", $"PCL-Community/PCL2-CE/{Basics.VersionName} (pclc.cc)")
-                    .WithHeader("Referer", $"https://{Basics.VersionCode}.ce.open.pcl2.server/");
+                    .WithHeader("User-Agent", $"PCL-DreamPort/{Basics.VersionName}");
             }
 
             var requestId = Guid.NewGuid().ToString();

@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Threading;
+using DreamPort.Core.Config;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Hints;
@@ -22,9 +23,9 @@ public partial class PageSetupLauncherLanguage : MyPageRight, ISetupResetPage
 
         ViewModel.ReloadRequested += OnReloadRequested;
         BtnTranslateWebsite.Click += (_, _) =>
-            Basics.OpenPath("https://translate.pclc.cc/projects/pcl-ce/");
+            Basics.OpenPath($"{DreamPortBuildConfig.RepoUrl}/pulls");
         BtnSubmitPullRequest.Click += (_, _) =>
-            Basics.OpenPath("https://github.com/PCL-Community/PCL-CE/pulls");
+            Basics.OpenPath($"{DreamPortBuildConfig.RepoUrl}/pulls");
 
         Loaded += (_, _) =>
         {

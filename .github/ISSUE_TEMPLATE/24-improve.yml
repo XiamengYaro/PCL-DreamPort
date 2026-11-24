@@ -8,13 +8,13 @@ body:
       label: "检查项 / Checklist"
       description: "请逐个检查下列项目，并勾选确认 / Please review each item below and check the boxes to confirm."
       options:
-        - label: "我已在 [Issues 页面](https://github.com/PCL-Community/PCL-CE/issues?q=is%3Aissue+) 中搜索，确认了这一建议未在社区版被提交过 / I have searched the [Issues page](https://github.com/PCL-Community/PCL-CE/issues?q=is%3Aissue+) and confirmed that this suggestion has not been submitted to the Community Edition yet."
+        - label: "我已在 [Issues 页面](https://github.com/Xiameng/PCL-DreamPort/issues?q=is%3Aissue+) 中搜索，确认了这一建议未在 PCL-DreamPort 被提交过 / I have searched the [Issues page](https://github.com/Xiameng/PCL-DreamPort/issues?q=is%3Aissue+) and confirmed that this suggestion has not been submitted yet."
           required: true
-        - label: "我确认只是全部选中而没有[仔细确认](https://github.com/PCL-Community/PCL-CE/issues?q=is%3Aissue+)就直接提交了这个 Issue，并且同意这个 Issue 可以直接被关闭 / I confirm that I checked all boxes without carefully reading them, and agree that this issue may be closed directly."
+        - label: "我确认只是全部选中而没有[仔细确认](https://github.com/Xiameng/PCL-DreamPort/issues?q=is%3Aissue+)就直接提交了这个 Issue，并且同意这个 Issue 可以直接被关闭 / I confirm that I checked all boxes without carefully reading them, and agree that this issue may be closed directly."
           required: false
         - label: "我确认我所描述的改进是现实的、有理有据的，而不是我临时起意的 / I confirm that the improvement I describe is realistic, reasonable, and well-justified, rather than something I came up with on a whim."
           required: true
-        - label: "我已知悉社区不对这类 Issue 的完成时间作出任何保证，并有足够的耐心等待社区开发者的处理，同时已知悉如果我作出催促、质问或类似的举动，这个 Issue 可能会被直接关闭 / I understand that the community does not guarantee any completion time for this type of issue, and I am willing to wait patiently for the community developers' review and handling. I also understand that excessive urging, demanding, or similar behavior may result in this issue being closed."
+        - label: "我已知悉维护团队不对这类 Issue 的完成时间作出任何保证，并有足够的耐心等待处理 / I understand that maintainers do not guarantee any completion time for this type of issue and am willing to wait patiently for review."
           required: true
         - label: "我确认已核实所描述的问题或需求真实存在，建议内容由我本人确认；如部分内容尚未确认，我已在描述中明确说明 / I confirm that the problem or need described actually exists and has been verified by me. If any part remains unconfirmed, I have clearly stated it in the description."
           required: true
@@ -22,7 +22,7 @@ body:
     id: "yml-ai-usage"
     attributes:
       label: "AI 使用情况 / AI Usage"
-      description: "请说明撰写本 Issue 时是否使用了生成式 AI。使用 AI 本身不构成违规，但必须如实披露并自行核实全部内容。详见 [生成式人工智能使用方针](https://docs.pclc.cc/ce/developers/ai-policy)。 / State whether generative AI was used when writing this issue. Using AI is not a violation, but it must be disclosed and all content must be verified by you. See the [Generative Artificial Intelligence Usage Policy](https://docs.pclc.cc/en/ce/developers/ai-policy)."
+      description: "请说明撰写本 Issue 时是否使用了生成式 AI。如使用了 AI，请如实披露并自行核实全部内容。 / State whether generative AI was used when writing this issue. Disclose AI usage honestly and verify all content yourself."
       options:
         - "未使用 / Not used"
         - "仅用于翻译或语言润色 / Translation or language editing only"

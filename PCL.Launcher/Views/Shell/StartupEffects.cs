@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using DreamPort.Core.Config;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
@@ -211,7 +212,7 @@ public sealed class StartupEffects(
                         Lang.Text("Main.SpecialVersion.OpenDownloadPageAndExit"),
                         () =>
                         {
-                            OpenWebsite("https://github.com/PCL-Community/PCL2-CE/releases/latest");
+                            OpenWebsite($"{DreamPortBuildConfig.RepoUrl}/releases/latest");
                             UiInteraction.Shutdown();
                         })),
                 IsWarn = true
