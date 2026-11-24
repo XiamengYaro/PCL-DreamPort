@@ -26,5 +26,6 @@
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\PCL.Core\PCL.Core.csproj" />
+        <ProjectReference Include="..\DreamPort.Core\DreamPort.Core.csproj" />
     </ItemGroup>
 </Project>

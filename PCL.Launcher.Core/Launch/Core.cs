@@ -31,13 +31,11 @@ public static partial class GameLaunch
         _ValidateLaunchPath();
         _ValidateLaunchInstance();
 
-#if BETA
-        _ShowDonateHint();
-#endif
-
 #if DEBUG || DEBUGCI
         return;
 #endif
+        // 严格遵守 PCL 许可指南：在 Release 与 Beta 均保留赞助劝导与正版购买劝导
+        _ShowDonateHint();
         _ShowPurchaseHint();
     }
 
@@ -149,7 +147,6 @@ public static partial class GameLaunch
         };
     }
 
-#if BETA
     private static readonly HashSet<int> DonateHintLaunchCounts =
     [
         10,
@@ -201,7 +198,6 @@ public static partial class GameLaunch
             },
             "Donate");
     }
-#endif
 
     private static void _ShowPurchaseHint()
     {

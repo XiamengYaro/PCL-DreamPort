@@ -1,0 +1,210 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DreamPort.UI.ViewModels"
+             x:Class="DreamPort.UI.Views.DreamPortAccountView"
+             x:DataType="vm:DreamPortAccountViewModel"
+             x:CompileBindings="True">
+    <StackPanel Spacing="14">
+        <Border Background="{DynamicResource ColorBrushBg0}"
+                BorderBrush="{DynamicResource ColorBrush1}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="14,10">
+            <StackPanel Spacing="4">
+                <TextBlock FontWeight="SemiBold"
+                           Foreground="{DynamicResource ColorBrush1}"
+                           Text="状态提示（Phase 1 PoC 原型）" />
+                <TextBlock TextWrapping="Wrap"
+                           Text="{Binding StatusMessage}" />
+                <ProgressBar Height="3"
+                             IsIndeterminate="True"
+                             IsVisible="{Binding IsBusy}" />
+            </StackPanel>
+        </Border>
+
+        <Border Background="{DynamicResource ColorBrushWhite}"
+                BorderBrush="{DynamicResource ColorBrushGray4}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="18,14">
+            <StackPanel Spacing="10">
+                <TextBlock FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource ColorBrush1}"
+                           Text="DreamPort 服务地址" />
+                <TextBlock FontSize="12"
+                           Opacity="0.8"
+                           TextWrapping="Wrap"
+                           Text="用于登录夏镇梦港站点账号及拉取服务端推送的 PCL 原生自定义主页（支持环境或本机自定义地址）。" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <TextBox Grid.Column="0"
+                             IsEnabled="{Binding !IsBusy}"
+                             Text="{Binding BaseUrl, Mode=TwoWay}" />
+                    <Button Grid.Column="1"
+                            Padding="14,6"
+                            Command="{Binding CheckServerCommand}"
+                            Content="检测连通性"
+                            IsEnabled="{Binding !IsBusy}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Background="{DynamicResource ColorBrushWhite}"
+                BorderBrush="{DynamicResource ColorBrushGray4}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="18,14"
+                IsVisible="{Binding IsNotLoggedIn}">
+            <StackPanel Spacing="10">
+                <TextBlock FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource ColorBrush1}"
+                           Text="登录 DreamPort 账号" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="用户名 / 邮箱" />
+                    <TextBox IsEnabled="{Binding !IsBusy}"
+                             Text="{Binding Username, Mode=TwoWay}" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="密码" />
+                    <TextBox IsEnabled="{Binding !IsBusy}"
+                             PasswordChar="*"
+                             Text="{Binding Password, Mode=TwoWay}" />
+                </StackPanel>
+
+                <StackPanel IsVisible="{Binding IsCaptchaRequired}"
+                            Spacing="6">
+                    <TextBlock Text="图形验证码" />
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                        <Border Grid.Column="0"
+                                Width="120"
+                                Height="40"
+                                Background="{DynamicResource ColorBrushBg0}"
+                                CornerRadius="4">
+                            <Image Source="{Binding CaptchaImage}"
+                                   Stretch="Uniform" />
+                        </Border>
+                        <TextBox Grid.Column="1"
+                                 IsEnabled="{Binding !IsBusy}"
+                                 Text="{Binding CaptchaInput, Mode=TwoWay}" />
+                        <Button Grid.Column="2"
+                                Padding="12,6"
+                                Command="{Binding RefreshCaptchaCommand}"
+                                Content="换一张"
+                                IsEnabled="{Binding !IsBusy}" />
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Button Padding="16,7"
+                            Command="{Binding LoginCommand}"
+                            Content="登录 DreamPort"
+                            IsEnabled="{Binding !IsBusy}" />
+                </StackPanel>
+
+                <Border IsVisible="{Binding Needs2Fa}"
+                        Background="{DynamicResource ColorBrushBg0}"
+                        BorderBrush="{DynamicResource ColorBrushGray4}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12">
+                    <StackPanel Spacing="8">
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="两步验证（TOTP）" />
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <TextBox Grid.Column="0"
+                                     IsEnabled="{Binding !IsBusy}"
+                                     Text="{Binding TwoFactorCode, Mode=TwoWay}" />
+                            <Button Grid.Column="1"
+                                    Padding="12,6"
+                                    Command="{Binding SubmitTotpCommand}"
+                                    Content="验证并登录"
+                                    IsEnabled="{Binding !IsBusy}" />
+                            <Button Grid.Column="2"
+                                    Padding="12,6"
+                                    Command="{Binding Cancel2FaCommand}"
+                                    Content="取消"
+                                    IsEnabled="{Binding !IsBusy}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border IsVisible="{Binding IsBanned}"
+                        Background="{DynamicResource ColorBrushBg0}"
+                        BorderBrush="IndianRed"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12">
+                    <StackPanel Spacing="4">
+                        <TextBlock FontWeight="SemiBold"
+                                   Foreground="IndianRed"
+                                   Text="账号封禁信息" />
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="{Binding BanSummary}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <Border Background="{DynamicResource ColorBrushWhite}"
+                BorderBrush="{DynamicResource ColorBrushGray4}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="18,14"
+                IsVisible="{Binding IsLoggedIn}">
+            <StackPanel Spacing="10">
+                <TextBlock FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource ColorBrush1}"
+                           Text="当前已登录账号" />
+                <TextBlock FontSize="16"
+                           FontWeight="SemiBold"
+                           Text="{Binding LoggedInUsername}" />
+                <TextBlock TextWrapping="Wrap"
+                           Opacity="0.88"
+                           Text="{Binding AccountMetaSummary}" />
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Button Padding="14,6"
+                            Command="{Binding ValidateAndRefreshProfileCommand}"
+                            Content="校验并刷新资料"
+                            IsEnabled="{Binding !IsBusy}" />
+                    <Button Padding="14,6"
+                            Command="{Binding LogoutCommand}"
+                            Content="退出登录"
+                            IsEnabled="{Binding !IsBusy}" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Background="{DynamicResource ColorBrushWhite}"
+                BorderBrush="{DynamicResource ColorBrushGray4}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="18,14">
+            <StackPanel Spacing="10">
+                <TextBlock FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource ColorBrush1}"
+                           Text="PCL 原生自定义主页来源（PoC 联调开关）" />
+                <TextBlock FontSize="12"
+                           Opacity="0.8"
+                           TextWrapping="Wrap"
+                           Text="默认优先请求站点的 /api/client/pcl-homepage，若后端尚未部署或离线则静默回退到内置原型 XAML。" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                    <ComboBox Grid.Column="0"
+                              SelectedIndex="{Binding HomepageModeIndex, Mode=TwoWay}">
+                        <ComboBoxItem Content="远端推送优先（不可用时回退内置原型）" />
+                        <ComboBoxItem Content="仅使用内置 XAML 原型" />
+                        <ComboBoxItem Content="空白主页（关闭自定义内容）" />
+                    </ComboBox>
+                    <Button Grid.Column="1"
+                            Padding="14,6"
+                            Command="{Binding ApplyHomepageModeCommand}"
+                            Content="应用并刷新主页" />
+                </Grid>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

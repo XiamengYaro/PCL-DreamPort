@@ -6,6 +6,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using DreamPort.UI.Helpers;
 using PCL.Core.Logging;
 using PCL.Core.UI.Dialogs;
 using PCL.UI.Controls;
@@ -13,12 +14,14 @@ using PCL.UI.Controls;
 namespace PCL.UI.Dialogs;
 
 /// <summary>
-/// 微软设备码登录弹窗：展示授权码与网页地址，自动打开网页并复制代码，随后按设备码间隔轮询授权结果。 关闭弹窗会取消轮询；结果通过
+/// 微软设备码登录弹窗：展示授权码、网页地址与扫码二维码，自动打开网页并复制代码，随后按设备码间隔轮询授权结果。 关闭弹窗会取消轮询；结果通过
 /// <see cref="DialogViewModel.CompletionHandler" /> 回传。
 /// </summary>
 public sealed class MyMsgLogin : MyMsgDialogBase
 {
     private readonly SelectableTextBlock _caption;
+    private readonly Border _qrBorder;
+    private readonly Image _qrImage;
 
     public MyMsgLogin(DialogViewModel dialog) : base(dialog)
     {
@@ -61,7 +64,37 @@ public sealed class MyMsgLogin : MyMsgDialogBase
                 Source = ViewModel
             });
         DialogTheme.BindBrush(_caption, TextBlock.ForegroundProperty, "ColorBrush1");
-        SetBody(_caption);
+
+        _qrImage = new Image
+        {
+            Width = 156d,
+            Height = 156d,
+            Stretch = Stretch.Uniform
+        };
+        _qrBorder = new Border
+        {
+            Margin = new Thickness(0d, 10d, 0d, 2d),
+            Padding = new Thickness(8d),
+            CornerRadius = new CornerRadius(6d),
+            Background = Brushes.White,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            IsVisible = false,
+            Child = _qrImage
+        };
+
+        var bodyStack = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Children = { _caption, _qrBorder }
+        };
+        SetBody(bodyStack);
+
+        ViewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(MyMsgLoginViewModel.CaptionText) or nameof(MyMsgLoginViewModel.Website))
+                UpdateQrCode();
+        };
+        UpdateQrCode();
 
         if (Content is Grid root)
         {
@@ -69,7 +102,18 @@ public sealed class MyMsgLogin : MyMsgDialogBase
             root.VerticalAlignment = VerticalAlignment.Center;
         }
 
-        Loaded += (_, _) => ViewModel.Start();
+        Loaded += (_, _) =>
+        {
+            ViewModel.Start();
+            UpdateQrCode();
+        };
+    }
+
+    private void UpdateQrCode()
+    {
+        var bmp = QrCodeRenderer.RenderToBitmap(ViewModel.Website, 6);
+        _qrImage.Source = bmp;
+        _qrBorder.IsVisible = bmp is not null;
     }
 
     public MyMsgLoginViewModel ViewModel { get; }

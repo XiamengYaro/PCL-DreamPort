@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
+using DreamPort.Core.Config;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Hints;
@@ -21,19 +22,18 @@ public partial class PageSetupAbout : MyPageRight
         PanScroll = PanBack;
         DataContext = ViewModel;
 
-        ItemAboutPcl.Title = Basics.Metadata.Name;
+        ItemAboutPcl.Title = $"{DreamPortBuildConfig.DisplayName}（第三方基于 PCL CE 独立二次创作，与官方无关）";
 
         BtnSponsorOriginalAuthor.Click += (_, _) => Basics.OpenPath("https://ifdian.net/a/LTCat");
         BtnGitHubHome.Click += (_, _) => Basics.OpenPath("https://github.com/PCL-Community");
         BtnSourceCode.Click +=
-            (_, _) => Basics.OpenPath("https://github.com/PCL-Community/PCL2-CE");
+            (_, _) => Basics.OpenPath(DreamPortBuildConfig.RepoUrl);
         BtnContributors.Click += (_, _) =>
             Basics.OpenPath("https://github.com/PCL-Community/PCL2-CE/graphs/contributors");
         BtnCommunitySource.Click +=
             (_, _) => Basics.OpenPath("https://github.com/PCL-Community/PCL2-CE");
         BtnCommunityLobbyPrivacy.Click += (_, _) =>
             Basics.OpenPath("https://www.pclc.cc/privacy/personal-info-brief.html");
-        BtnNatayarkTerms.Click += (_, _) => Basics.OpenPath("https://account.naids.com/policy");
         BtnUpstreamTerms.Click +=
             (_, _) => Basics.OpenPath("https://shimo.im/docs/rGrd8pY8xWkt6ryW");
         BtnUpstreamSource.Click += (_, _) => Basics.OpenPath("https://github.com/Meloong-Git/PCL");

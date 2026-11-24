@@ -102,36 +102,7 @@ public class LobbyService() : GeneralService("lobby", "LobbyService")
                 LogWrapper.Info("LobbyService", "EasyTier files check completed.");
             }
 
-            // refresh naid token
-            var naidRefreshToken = States.Link.NaidRefreshToken;
-            if (!string.IsNullOrWhiteSpace(naidRefreshToken))
-            {
-                var expTime = States.Link.NaidRefreshExpireTime;
-                if (!string.IsNullOrWhiteSpace(expTime)
-                    && DateTime.TryParse(expTime, out var expireAt)
-                    && expireAt.CompareTo(DateTime.Now) < 0)
-                {
-                    States.Link.NaidRefreshToken = string.Empty;
-                    NatayarkProfileManager.ResetProfile();
-                    HintWrapper.Show(
-                        Lang.Text("Tools.GameLink.Natayark.TokenExpired"),
-                        HintTheme.Error);
-                }
-                else
-                {
-                    try
-                    {
-                        await NatayarkProfileManager
-                            .GetNaidDataAsync(naidRefreshToken, true)
-                            .ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogWrapper.Warn(ex, "LobbyService", "刷新 Natayark 登录信息失败，需要重新登录");
-                    }
-                }
-            }
-
+            // PCL-DreamPort 已移除 Natayark 账号依赖，直接使用 EasyTier 联机
             _SetState(LobbyState.Initialized);
             LogWrapper.Info("LobbyService", "Lobby service initialized successfully.");
 
@@ -213,8 +184,7 @@ public class LobbyService() : GeneralService("lobby", "LobbyService")
 
     private static bool _NotHaveNaid()
     {
-        return LobbyInfoProvider.RequiresLogin
-            && string.IsNullOrWhiteSpace(NatayarkProfileManager.NaidProfile.AccessToken);
+        return false;
     }
 
     /// <summary>Create a new lobby.</summary>

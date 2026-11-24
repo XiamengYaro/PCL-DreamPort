@@ -1,0 +1,27 @@
+PCL-DreamPort (PCL-梦港) 许可与第三方归属声明
+
+本软件「PCL-梦港（PCL-DreamPort）」是第三方基于 Plain Craft Launcher (PCL) 与
+PCL Community Edition (PCL CE) 独立二次创作的衍生修改版，与龙腾猫跃及 PCL 官方无关联。
+
+一、双许可证范围
+
+1. PCL.Launcher/ 与 PCL.Launcher.Core/ 目录：
+   继续严格适用并完整保留原自定义许可文件（PCL.Launcher/LICENCE 与
+   PCL.Launcher.Core/LICENCE 中的《PCL 分发有限许可》及《PCL 存储库合理使用指南》）。
+   - 关于页面首位保留原作者龙腾猫跃署名与赞助链接；
+   - 启动流程保留正版购买劝导与赞助劝导（McLaunchPrecheck）；
+   - Windows 平台界面主色相锁定为蓝色系；
+   - 全部衍生修改源代码公开且持续免费分发。
+
+2. 其余目录（含 PCL.Core/、PCL.Core.UI/、PCL.Platform/、PCL.Localization/、
+   PCL.Core.SourceGenerators/、PCL.Core.Test/ 以及新建的 DreamPort.Core/、
+   DreamPort.UI/、DreamPort.Test/）：
+   适用 Apache License 2.0（详见根目录 LICENSE）。
+   主要修改内容（相比上游 PCL-Community/PCL-CE dev 基线）：
+   - 新增 DreamPort.Core / DreamPort.UI / DreamPort.Test 模块；
+   - 接入自建梦港镜像源（dl.xmcraft.cn）与下载层 User-Agent 隔离；
+   - 接入 DreamPort 账号登录与 PCL 原生自定义主页原型；
+   - 仅保留微软正版游戏账号登录并增加设备码二维码展示；
+   - 移除 Natayark ID 登录门控，保留 EasyTier 联机能力；
+   - 禁用向上游 Sentry 的遥测上报与上游联机统计上报；
+   - 隔离应用标识与本地数据存储目录，不覆盖原有 PCL CE 配置。

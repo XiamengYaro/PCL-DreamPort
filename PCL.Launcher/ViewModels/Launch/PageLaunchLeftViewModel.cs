@@ -190,7 +190,7 @@ public partial class PageLaunchLeftViewModel : ViewModelBase
         {
             0 or 1 => false,
             2 => true,
-            _ => ProfileService.Current is not null
+            _ => ProfileService.Current is not null && ProfileService.Current.ProfileType == ProfileType.Microsoft
         };
         var instanceButtonVisible =
             !Config.Preference.Hide.FunctionSelect || HiddenFeatureState.ForceShow;
@@ -204,13 +204,13 @@ public partial class PageLaunchLeftViewModel : ViewModelBase
         if (targetLoginType != default)
             return targetLoginType switch
             {
-                GameLaunch.McLoginType.Ms => LaunchPageKind.Ms,
-                GameLaunch.McLoginType.Auth => LaunchPageKind.Auth,
-                GameLaunch.McLoginType.Legacy => LaunchPageKind.Offline,
+                // 仅保留正版微软登录；屏蔽离线与第三方外置登录跳转
+                GameLaunch.McLoginType.Ms or GameLaunch.McLoginType.Auth or GameLaunch.McLoginType.Legacy
+                    => LaunchPageKind.Ms,
                 _ => LaunchPageKind.Profile
             };
 
-        if (ProfileService.Current is not null)
+        if (ProfileService.Current is not null && ProfileService.Current.ProfileType == ProfileType.Microsoft)
         {
             if (_launchButtonAction == LaunchButtonAction.Launch)
                 IsLaunchButtonEnabled = true;

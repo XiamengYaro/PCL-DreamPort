@@ -77,68 +77,21 @@ public partial class PageLoginProfileViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public async Task CreateProfileAsync()
+    public Task CreateProfileAsync()
     {
         try
         {
-            var includeOthers = PageInstanceSetupViewModel.CanCreateOtherProfile();
-            var options = new List<DialogOption>
-            {
-                new()
-                {
-                    Text = Lang.Text("Launch.Account.Type.Microsoft"),
-                    SvgIcon = "lucide/shield-check"
-                }
-            };
-            if (includeOthers)
-            {
-                options.Add(
-                    new DialogOption
-                    {
-                        Text = Lang.Text("Launch.Account.Type.ThirdParty"),
-                        SvgIcon = "lucide/network"
-                    });
-                options.Add(
-                    new DialogOption
-                    {
-                        Text = Lang.Text("Launch.Account.Type.Offline"),
-                        SvgIcon = "lucide/link-2-off"
-                    });
-            }
-
-            var result = await Dialog.ShowAsync(
-                new SelectDialogRequest
-                {
-                    Title = Lang.Text("Launch.Account.Profile.Create.SelectAuthType.Title"),
-                    Options = options,
-                    Buttons = DialogButtons.From(
-                        DialogButton.Create(Lang.Text("Common.Action.Continue")),
-                        DialogButton.Create(Lang.Text("Common.Action.Cancel"))),
-                    HighLight = false
-                });
-            if (!result.IsConfirmed)
-                return;
-
-            var type = result.SelectedIndex switch
-            {
-                0 => GameLaunch.McLoginType.Ms,
-                1 => GameLaunch.McLoginType.Auth,
-                _ => GameLaunch.McLoginType.Legacy
-            };
+            // PCL-梦港仅支持正版微软账号登录，新建档案直接进入微软设备码登录流程
             ProfileService.IsCreatingProfile = true;
-            if (type == GameLaunch.McLoginType.Auth && !await TrySelectAuthServerAsync())
-            {
-                ProfileService.IsCreatingProfile = false;
-                return;
-            }
-
-            LoginTypeRequested?.Invoke(type);
+            LoginTypeRequested?.Invoke(GameLaunch.McLoginType.Ms);
         }
         catch (Exception ex)
         {
             ProfileService.IsCreatingProfile = false;
-            LauncherCommon.Log(ex, "选择验证方式失败", LauncherLogLevel.Feedback);
+            LauncherCommon.Log(ex, "启动微软登录流程失败", LauncherLogLevel.Feedback);
         }
+
+        return Task.CompletedTask;
     }
 
     private async Task<bool> TrySelectAuthServerAsync()

@@ -106,48 +106,6 @@ public partial class PageToolsGameLinkViewModel : ViewModelBase
             return false;
         }
 
-        if (LobbyInfoProvider.RequiresLogin)
-        {
-            var token = States.Link.NaidRefreshToken;
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                HintService.Show(Hints.Error(Lang.Text("Link.Mod.LoginFirst")));
-                return false;
-            }
-
-            try
-            {
-                await NatayarkProfileManager.GetNaidDataAsync(token, true).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                LogWrapper.Error(ex, "Link", "刷新 Natayark 登录信息失败");
-                HintService.Show(Hints.Error(Lang.Text("Link.Mod.ReLoginRequired")));
-                RunOnUi(UpdateAccountDisplay);
-                return false;
-            }
-
-            RunOnUi(UpdateAccountDisplay);
-            var profile = NatayarkProfileManager.NaidProfile;
-            if (string.IsNullOrWhiteSpace(profile.Username))
-            {
-                HintService.Show(Hints.Error(Lang.Text("Link.Mod.NaidFetchFailed")));
-                return false;
-            }
-
-            if (LobbyInfoProvider.RequiresRealName && !profile.IsRealNamed)
-            {
-                HintService.Show(Hints.Error(Lang.Text("Link.Mod.RealNameRequired")));
-                return false;
-            }
-
-            if (profile.Status != 0)
-            {
-                HintService.Show(Hints.Error(Lang.Text("Link.Mod.AccountBanned")));
-                return false;
-            }
-        }
-
         var username = GetUsername();
         if (string.IsNullOrWhiteSpace(username))
         {
@@ -1060,10 +1018,8 @@ public partial class PageToolsGameLinkViewModel : ViewModelBase
             if (root["available"] is null)
                 throw new InvalidDataException("联机大厅公告缺少可用状态");
 
-            var available = ReadBool(root["available"], false);
-            var allowCustomName = ReadBool(root["allowCustomName"], false);
-            var requiresLogin = ReadBool(root["requireLogin"], true);
-            var requiresRealName = ReadBool(root["requireRealname"], true);
+            var available = ReadBool(root["available"], true);
+            var allowCustomName = ReadBool(root["allowCustomName"], true);
             var protocolVersion = ReadDouble(root["version"], double.NaN);
             if (double.IsNaN(protocolVersion))
                 throw new InvalidDataException("联机大厅公告缺少协议版本号");
@@ -1091,8 +1047,8 @@ public partial class PageToolsGameLinkViewModel : ViewModelBase
 
             LobbyInfoProvider.IsLobbyAvailable = available;
             LobbyInfoProvider.AllowCustomName = allowCustomName;
-            LobbyInfoProvider.RequiresLogin = requiresLogin;
-            LobbyInfoProvider.RequiresRealName = requiresRealName;
+            LobbyInfoProvider.RequiresLogin = false;
+            LobbyInfoProvider.RequiresRealName = false;
             ETRelay.RelayList = relays;
 
             Volatile.Write(ref _announcementItems, announcements.ToArray());
@@ -1116,17 +1072,26 @@ public partial class PageToolsGameLinkViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            LogWrapper.Warn(ex, "Link", "获取联机大厅公告失败");
+            LogWrapper.Warn(ex, "Link", "获取联机大厅公告失败，已切回本地 EasyTier 直连模式");
             if (!IsCurrentAnnouncementRequest(requestId))
                 return;
 
-            LobbyInfoProvider.IsLobbyAvailable = false;
-            SetAnnouncementState(AnnouncementLoadState.Failed, AnnouncementFailureKind.Connect);
+            // 未配置 PCL 社区公告服务器时默认允许直接使用 EasyTier 内置节点联机，无需 Natayark 鉴权
+            LobbyInfoProvider.IsLobbyAvailable = true;
+            LobbyInfoProvider.AllowCustomName = true;
+            LobbyInfoProvider.RequiresLogin = false;
+            LobbyInfoProvider.RequiresRealName = false;
+            Volatile.Write(
+                ref _announcementItems,
+                [new LinkAnnounceInfo(LinkAnnounceType.Notice, "EasyTier 联机已就绪（当前直接走内置公开或自定义中继节点，无需 Natayark 登录）。")]);
+            SetAnnouncementState(AnnouncementLoadState.Loaded, AnnouncementFailureKind.None);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (!IsCurrentAnnouncementRequest(requestId))
                     return;
-                NotifyAnnouncement();
+                _announcementIndex = 0;
+                ShowAnnouncement(0);
+                EnsureAccountState();
             });
         }
     }
@@ -1721,43 +1686,8 @@ public partial class PageToolsGameLinkViewModel : ViewModelBase
 
     private void EnsureAccountState()
     {
-        if (!Dispatcher.UIThread.CheckAccess())
-        {
-            Dispatcher.UIThread.Post(EnsureAccountState);
-            return;
-        }
-
-        if (_accountBusy)
-            return;
-
-        if (string.IsNullOrWhiteSpace(States.Link.NaidRefreshToken))
-        {
-            _accountRefreshFailed = false;
-            UpdateAccountDisplay();
-            return;
-        }
-
-        if (IsNaidTokenExpired())
-        {
-            ClearNaidSession();
-            if (!_tokenExpiredHintShown)
-            {
-                _tokenExpiredHintShown = true;
-                HintService.Show(Hints.Error(Lang.Text("Tools.GameLink.Natayark.TokenExpired")));
-            }
-
-            UpdateAccountDisplay();
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(NatayarkProfileManager.NaidProfile.Username))
-        {
-            _ = RefreshNaidProfileAsync();
-            return;
-        }
-
+        // PCL-DreamPort 已移除 Natayark 账号认证流程
         _accountRefreshFailed = false;
-        UpdateAccountDisplay();
     }
 
     private static bool IsNaidTokenExpired()

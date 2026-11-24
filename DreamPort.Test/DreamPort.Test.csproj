@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Library</OutputType>
+        <LangVersion>15.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
+        <Configurations>Debug;CI;Release;Beta</Configurations>
+        <Platforms>AnyCPU;x64;ARM64</Platforms>
+        <PlatformTarget>$(Platform)</PlatformTarget>
+        <AssemblyTitle>DreamPort.Test</AssemblyTitle>
+        <Product>PCL-DreamPort</Product>
+        <Copyright>Copyright © DreamPort Contributors</Copyright>
+        <RootNamespace>DreamPort.Test</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+        <PackageReference Include="MSTest.TestAdapter" Version="4.5.3" />
+        <PackageReference Include="MSTest.TestFramework" Version="4.5.3" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\DreamPort.Core\DreamPort.Core.csproj" />
+        <ProjectReference Include="..\DreamPort.UI\DreamPort.UI.csproj" />
+        <ProjectReference Include="..\PCL.Core\PCL.Core.csproj" />
+        <ProjectReference Include="..\PCL.Launcher.Core\PCL.Launcher.Core.csproj" />
+        <ProjectReference Include="..\PCL.Launcher\PCL.Launcher.csproj" />
+    </ItemGroup>
+</Project>

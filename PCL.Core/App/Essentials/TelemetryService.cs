@@ -25,89 +25,14 @@ public sealed partial class TelemetryService
 
     private static void _InitSentry()
     {
-        Context.Info("开始初始化 Sentry SDK");
-        var dsn = EnvironmentInterop.GetSecret("SENTRY_DSN");
-        if (dsn is null)
-        {
-            Context.Warn("未找到 Sentry DSN");
-            return;
-        }
-
-        var release = $"{Basics.VersionName}";
-
-#if DEBUG
-        var environment = "Debug";
-#else
-        var environment = "Production";
-#endif
-
-        SentrySdk.Init(options =>
-        {
-            options.Dsn = dsn;
-#if DEBUG
-            options.Debug = true;
-#else
-            options.Debug = false;
-#endif
-            options.SendDefaultPii = false;
-            options.IsGlobalModeEnabled = true;
-            options.AutoSessionTracking = true;
-            options.Release = release;
-            options.Environment = environment;
-
-            // 应该被直接丢弃不上报的异常类型
-            options.AddExceptionFilterForType<TimeoutException>();
-            options.AddExceptionFilterForType<HttpRequestException>();
-            options.AddExceptionFilterForType<WebException>();
-            options.AddExceptionFilterForType<TaskCanceledException>();
-            options.AddExceptionFilterForType<DirectoryNotFoundException>();
-            options.AddExceptionFilterForType<UnauthorizedAccessException>();
-            options.AddExceptionFilterForType<FileNotFoundException>();
-
-            // 细分类型的过滤器
-            options.AddExceptionFilter(new SocketExceptionFilter());
-
-            options.SetBeforeSend(@event => @event.Level is SentryLevel.Debug ? null : @event);
-        });
-
-        SentrySdk.ConfigureScope(scope =>
-        {
-            scope.User = new SentryUser
-            {
-                Id = Identify.LauncherId
-            };
-        });
-
-        Context.Info("Sentry SDK 初始化完成");
+        // PCL-DreamPort 禁用向 PCL Community 上游 Sentry 上报遥测数据
+        Context.Info("上游 Sentry 遥测已禁用（PCL-DreamPort）");
     }
 
     // 错误上报
     public static void ReportException(Exception ex, string plain, LogLevel level)
     {
-        // Building the event parses the whole stack trace, which is wasted work while telemetry is
-        // off.
-        if (!SentrySdk.IsEnabled) return;
-
-        var sentryEvent = new SentryEvent(ex)
-        {
-            Level = level.RealLevel() switch
-            {
-                LogLevel.Fatal => SentryLevel.Fatal,
-                LogLevel.Error => SentryLevel.Error,
-                LogLevel.Warning => SentryLevel.Warning,
-                LogLevel.Info => SentryLevel.Info,
-                LogLevel.Debug or LogLevel.Trace => SentryLevel.Debug,
-                _ => throw new ArgumentOutOfRangeException(nameof(level))
-            }
-        };
-
-        if (!string.IsNullOrWhiteSpace(plain))
-            sentryEvent.Message = new SentryMessage
-            {
-                Formatted = plain
-            };
-
-        SentrySdk.CaptureEvent(sentryEvent);
+        // 上游遥测已禁用
     }
 
     private static ulong _GetPhysicalMemoryBytes()
@@ -134,44 +59,10 @@ public sealed partial class TelemetryService
     }
 
     [LifecycleStart]
-    private static async Task _StartAsync()
+    private static Task _StartAsync()
     {
-        if (!Config.System.Telemetry) return;
-        if (!await BuildProvenance.IsTrustedAsync().ConfigureAwait(false))
-        {
-            IsBuildUntrusted = true;
-            Context.Warn($"当前版本 {Basics.VersionName} 的文件哈希与官方发布资产不匹配，遥测上报已禁用");
-            return;
-        }
-
-        _InitSentry();
-
-        var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-
-        var telemetry = new TelemetryDeviceEnvironment
-        {
-            Tag = "Telemetry",
-            Id = Identify.LauncherId,
-            Os = Environment.OSVersion.Version.Build,
-            Is64Bit = Environment.Is64BitOperatingSystem,
-            IsArm64 = RuntimeInformation.OSArchitecture.Equals(Architecture.Arm64),
-            Launcher = Basics.VersionName,
-            LauncherBranch = Config.Update.UpdateChannel switch
-            {
-                UpdateChannel.Release => "Release",
-                UpdateChannel.Beta => "Beta",
-                UpdateChannel.Dev => "Dev",
-                _ => "Unknown"
-            },
-            // 官方启动器 EULA 记录在 Windows 注册表中，非 Windows 没有对应概念（不可抗力），固定为 false
-            UsedOfficialPcl = false,
-            UsedHmcl = Directory.Exists(Path.Combine(appDataFolder, ".hmcl")),
-            UsedBakaXl = Directory.Exists(Path.Combine(appDataFolder, "BakaXL")),
-            Memory = _GetPhysicalMemoryBytes(),
-            Ipv6Status = NetworkInterfaceUtils.GetIPv6Status().ToString()
-        };
-
-        _ReportDeviceEnvironment(telemetry);
+        Context.Info("已跳过上游遥测环境上报（PCL-DreamPort）");
+        return Task.CompletedTask;
     }
 
     [LifecycleStop]

@@ -84,6 +84,7 @@ public static class HomepageSource
         var type = Config.Preference.Homepage.Type;
         return type switch
         {
+            0 => ResolveDreamPortHomepage(onNetworkDownload, onBackgroundUpdated),
             1 => ResolveLocalFile(),
             2 => ResolveRemote(
                 Config.Preference.Homepage.CustomUrl,
@@ -97,6 +98,59 @@ public static class HomepageSource
             {
                 Kind = HomepageSourceKind.Blank
             }
+        };
+    }
+
+    private static HomepageContent ResolveDreamPortHomepage(
+        Action? onNetworkDownload,
+        Action<HomepageContent>? onBackgroundUpdated)
+    {
+        var mode = Config.Preference.Homepage.DreamPortMode;
+        if (mode == 2)
+        {
+            return new HomepageContent
+            {
+                Kind = HomepageSourceKind.Blank
+            };
+        }
+
+        if (mode == 1)
+            return ResolveEmbeddedDreamPortPrototype();
+
+        var session = new DreamPort.Core.Auth.DreamPortSessionStore().Load();
+        var remoteUrl = DreamPort.Core.Homepage.DreamPortHomepageService.GetRemoteHomepageUrl(session.BaseUrl);
+        var remote = ResolveRemote(
+            remoteUrl,
+            null,
+            updated =>
+            {
+                if (string.IsNullOrEmpty(updated.ErrorMessage)
+                    && !string.IsNullOrWhiteSpace(updated.Xaml)
+                    && PCL.Xaml.HomepageXamlFormatDetector.IsXaml(updated.Xaml))
+                {
+                    onBackgroundUpdated?.Invoke(updated);
+                }
+            });
+        if (remote.Kind == HomepageSourceKind.CustomXaml
+            && !string.IsNullOrWhiteSpace(remote.Xaml)
+            && PCL.Xaml.HomepageXamlFormatDetector.IsXaml(remote.Xaml))
+        {
+            return remote;
+        }
+
+        // PoC/离线或后端暂未部署 /api/client/pcl-homepage 时静默回退内置原型，不打断启动
+        return ResolveEmbeddedDreamPortPrototype();
+    }
+
+    private static HomepageContent ResolveEmbeddedDreamPortPrototype()
+    {
+        var xaml = DreamPort.Core.Homepage.DreamPortHomepageService.GetPrototypeXaml();
+        return new HomepageContent
+        {
+            Kind = HomepageSourceKind.CustomXaml,
+            SourceText = "DreamPort 内置原型主页",
+            Xaml = xaml,
+            ContentLength = xaml.Length
         };
     }
 

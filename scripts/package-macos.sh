@@ -23,7 +23,7 @@ esac
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DOTNET="${DOTNET:-$(command -v dotnet || echo "$HOME/.dotnet/dotnet")}"
-APP_NAME="PCL CE.app"
+APP_NAME="PCL-梦港.app"
 APP="$OUT/$APP_NAME"
 TEMP="$OUT/.publish-$RID"
 
@@ -45,6 +45,8 @@ chmod +x "$APP/Contents/MacOS/PCL.Launcher"
 
 cp "$ROOT/PCL.Launcher/Assets/Images/icon.icns" "$APP/Contents/Resources/icon.icns"
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE"
+cp "$ROOT/NOTICE" "$APP/Contents/Resources/NOTICE"
+cp "$ROOT/PCL.Launcher/LICENCE" "$APP/Contents/Resources/LICENCE.PCL.Launcher"
 cp "$ROOT/PCL.Launcher.Core/LICENCE" "$APP/Contents/Resources/LICENCE.PCL.Launcher.Core"
 printf 'macos-app\n' > "$APP/Contents/Resources/package-kind"
 
@@ -55,8 +57,8 @@ set -eu
 HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 export PCL_PACKAGE_KIND=macos-app
-export PCL_DATA_DIR="${PCL_DATA_DIR:-$HOME/PCLCE}"
-export PCL_MINECRAFT_DIR="${PCL_MINECRAFT_DIR:-$HOME/PCLCE/.minecraft}"
+export PCL_DATA_DIR="${PCL_DATA_DIR:-$HOME/PCL-DreamPort}"
+export PCL_MINECRAFT_DIR="${PCL_MINECRAFT_DIR:-$HOME/PCL-DreamPort/.minecraft}"
 
 exec "$HERE/PCL.Launcher" "$@"
 LAUNCHER
@@ -83,11 +85,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>PCL CE</string>
+    <string>PCL-梦港</string>
     <key>CFBundleDisplayName</key>
-    <string>PCL Community Edition</string>
+    <string>PCL-梦港</string>
     <key>CFBundleIdentifier</key>
-    <string>cc.pclc.pcl-ce</string>
+    <string>cn.xmcraft.pcl-dreamport</string>
     <key>CFBundleExecutable</key>
     <string>launcher</string>
     <key>CFBundleIconFile</key>
@@ -104,10 +106,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <true/>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>PCL-梦港需要访问本地局域网，以便探测局域网联机世界端口及创建局域网转发。</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright © PCL Community</string>
+    <string>Copyright © PCL Community &amp; DreamPort Contributors</string>
     <key>CFBundleLocalizations</key>
     <array>
         <string>zh-Hans</string>

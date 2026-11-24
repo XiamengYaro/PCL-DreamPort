@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <AssemblyTitle>DreamPort.Core</AssemblyTitle>
+        <AssemblyName>DreamPort.Core</AssemblyName>
+        <Description>PCL-DreamPort 核心业务与扩展服务库</Description>
+        <Company>DreamPort</Company>
+        <Product>PCL-DreamPort</Product>
+        <Copyright>Copyright © DreamPort Contributors</Copyright>
+        <RootNamespace>DreamPort.Core</RootNamespace>
+        <TargetFramework>net10.0</TargetFramework>
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
+        <LangVersion>15.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Configurations>Debug;CI;Release;Beta</Configurations>
+        <Platforms>AnyCPU;x64;ARM64</Platforms>
+        <PlatformTarget>$(Platform)</PlatformTarget>
+        <NoWarn>$(NoWarn);CS9113</NoWarn>
+    </PropertyGroup>
+    <ItemGroup>
+        <EmbeddedResource Include="Resources\DreamPortHomepagePrototype.xaml" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\PCL.Core\PCL.Core.csproj" />
+    </ItemGroup>
+</Project>

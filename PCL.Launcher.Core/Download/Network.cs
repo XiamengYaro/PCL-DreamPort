@@ -1,3 +1,4 @@
+using DreamPort.Core.Mirror;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.Utils;
@@ -170,7 +171,10 @@ public static partial class GameDownload
         IEnumerable<string> officialUrls,
         IEnumerable<string> mirrorUrls)
     {
-        return DownloadSources.Order(officialUrls, mirrorUrls);
+        return DreamPortMirrorPolicy.BuildCandidateUrls(
+            officialUrls,
+            mirrorUrls,
+            DownloadSources.ResolveMode(DlSourcePreferMojang));
     }
 
     /// <summary>
@@ -180,9 +184,10 @@ public static partial class GameDownload
         IEnumerable<string> officialUrls,
         IEnumerable<string> mirrorUrls)
     {
-        return DlVersionListPreferMojang
-            ? officialUrls.Union(mirrorUrls)
-            : mirrorUrls.Union(officialUrls);
+        return DreamPortMirrorPolicy.BuildCandidateUrls(
+            officialUrls,
+            mirrorUrls,
+            DownloadSources.ResolveMode(DlVersionListPreferMojang));
     }
 
     /// <summary>
@@ -216,35 +221,35 @@ public static partial class GameDownload
     public static IEnumerable<string> DlSourceLibraryGet(string original)
     {
         if (SourceArray.Any(original.Contains))
-            return
-            [
-                original
-                    .Replace(
-                        "https://piston-data.mojang.com",
-                        "https://bmclapi2.bangbang93.com/maven")
-                    .Replace(
-                        "https://piston-meta.mojang.com",
-                        "https://bmclapi2.bangbang93.com/maven")
-                    .Replace(
-                        "https://libraries.minecraft.net",
-                        "https://bmclapi2.bangbang93.com/maven")
-                    .Replace(
-                        "https://zkitefly.github.io/unlisted-versions-of-minecraft",
-                        "https://alist.8mi.tech/d/mirror/unlisted-versions-of-minecraft/Auto"),
-                original
-                    .Replace(
-                        "https://piston-data.mojang.com",
-                        "https://bmclapi2.bangbang93.com/libraries")
-                    .Replace(
-                        "https://piston-meta.mojang.com",
-                        "https://bmclapi2.bangbang93.com/libraries")
-                    .Replace(
-                        "https://libraries.minecraft.net",
-                        "https://bmclapi2.bangbang93.com/libraries")
-                    .Replace(
-                        "https://zkitefly.github.io/unlisted-versions-of-minecraft",
-                        "https://alist.8mi.tech/d/mirror/unlisted-versions-of-minecraft/Auto")
-            ];
+        {
+            var bmclMaven = original
+                .Replace(
+                    "https://piston-data.mojang.com",
+                    "https://bmclapi2.bangbang93.com/maven")
+                .Replace(
+                    "https://piston-meta.mojang.com",
+                    "https://bmclapi2.bangbang93.com/maven")
+                .Replace(
+                    "https://libraries.minecraft.net",
+                    "https://bmclapi2.bangbang93.com/maven")
+                .Replace(
+                    "https://zkitefly.github.io/unlisted-versions-of-minecraft",
+                    "https://alist.8mi.tech/d/mirror/unlisted-versions-of-minecraft/Auto");
+            var bmclLibs = original
+                .Replace(
+                    "https://piston-data.mojang.com",
+                    "https://bmclapi2.bangbang93.com/libraries")
+                .Replace(
+                    "https://piston-meta.mojang.com",
+                    "https://bmclapi2.bangbang93.com/libraries")
+                .Replace(
+                    "https://libraries.minecraft.net",
+                    "https://bmclapi2.bangbang93.com/libraries")
+                .Replace(
+                    "https://zkitefly.github.io/unlisted-versions-of-minecraft",
+                    "https://alist.8mi.tech/d/mirror/unlisted-versions-of-minecraft/Auto");
+            return DlSourceOrder([original], [bmclMaven, bmclLibs]);
+        }
 
         return DlSourceOrder(
             [original],

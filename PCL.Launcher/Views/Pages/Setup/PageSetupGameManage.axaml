@@ -14,6 +14,29 @@
             <ui:MyCard Margin="0,15"
                        Title="{loc:Loc Setup.GameManage.Source.Title}">
                 <StackPanel Margin="25,37,25,15">
+                    <Grid Margin="0,0,0,7"
+                          IsVisible="{Binding DreamPortMirrorVisible}"
+                          RowDefinitions="28">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"
+                                              SharedSizeGroup="Name" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,25,0"
+                                   Text="{loc:Loc Setup.GameManage.Source.DreamPort}" />
+                        <ui:MyComboBox x:Name="ComboDreamPortMirrorMode"
+                                       Grid.Row="0"
+                                       Grid.Column="1"
+                                       HorizontalAlignment="Stretch"
+                                       SelectedIndex="{Binding DreamPortSourceIndex, Mode=TwoWay}">
+                            <ui:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.DreamPort.Auto}" />
+                            <ui:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.DreamPort.SelfFirst}" />
+                            <ui:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.DreamPort.BmclapiFirst}" />
+                            <ui:MyComboBoxItem Content="{loc:Loc Setup.GameManage.Source.DreamPort.OfficialFirst}" />
+                        </ui:MyComboBox>
+                    </Grid>
                     <Grid x:Name="PanDownloadSource"
                           RowDefinitions="28,7,28,7,27,7,27,27,27,27,27">
                         <Grid.ColumnDefinitions>

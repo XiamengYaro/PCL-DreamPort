@@ -1,4 +1,5 @@
 using System.Net;
+using DreamPort.Core.Config;
 using PCL.Core.App;
 
 namespace PCL.Network;
@@ -14,6 +15,8 @@ public static class RequestSigning
 
     /// <summary>
     ///     设置 Headers 的 UA、Referer。
+    ///     下载层在未指定浏览器 UA 与自定义 UA 时使用最简的 DownloadUserAgent（无括号无网址），
+    ///     避免 BMCLAPI / CDN 302 跳转返回 0 字节空体。
     /// </summary>
     internal static void SecretHeadersSign(
         string url,
@@ -32,7 +35,7 @@ public static class RequestSigning
             ? customUserAgent
             : useBrowserUserAgent
                 ? $"PCL2/{LauncherCommon.UpstreamVersion}.{LauncherCommon.VersionBranchCode} PCLCE/{LauncherCommon.VersionStandardCode} Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0"
-                : $"PCL2/{LauncherCommon.UpstreamVersion}.{LauncherCommon.VersionBranchCode} PCLCE/{LauncherCommon.VersionStandardCode}";
+                : DreamPortBuildConfig.DownloadUserAgent;
         client.Headers.Add("User-Agent", userAgent);
     }
 }

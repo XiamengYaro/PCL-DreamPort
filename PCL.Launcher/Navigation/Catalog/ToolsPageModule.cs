@@ -27,7 +27,15 @@ public sealed class ToolsPageModule : IPageModule
             "utilities",
             1,
             (sp, _) => ActivatorUtilities.CreateInstance<PageToolsTest>(sp),
-            () => !Config.Preference.Hide.ToolsTest)
+            () => !Config.Preference.Hide.ToolsTest),
+        Sub(
+            PageIds.Tools,
+            SubPageIds.ToolsDreamPortAccount,
+            "Tools.Left.DreamPortAccount",
+            "lucide/user",
+            "dreamport",
+            2,
+            (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortAccount>(sp))
     ];
 
     public IReadOnlyList<PageDescriptor> Pages { get; } =
@@ -41,7 +49,8 @@ public sealed class ToolsPageModule : IPageModule
             SubPageIds.ToolsGameLink,
             [
                 new PageGroupDescriptor("multiplayer", "Tools.Left.Multiplayer", 0),
-                new PageGroupDescriptor("utilities", "Tools.Left.Utilities", 1)
+                new PageGroupDescriptor("utilities", "Tools.Left.Utilities", 1),
+                new PageGroupDescriptor("dreamport", "Tools.Left.DreamPort", 2)
             ],
             ToolsSubPages,
             (sp, descriptor) => ActivatorUtilities.CreateInstance<ToolsPageHost>(sp, descriptor))

@@ -22,11 +22,11 @@ public static class Paths
     static Paths()
     {
 #if DEBUG
-        const string name = "PCLCE_Debug";
-        const string oldName = ".PCLCEDebug";
+        const string name = "PCL-DreamPort_Debug";
+        const string oldName = ".PCLDreamPortDebug";
 #else
-        const string name = "PCLCE";
-        const string oldName = ".PCLCE";
+        const string name = "PCL-DreamPort";
+        const string oldName = ".PCLDreamPort";
 #endif
         PackageKind = _ReadPackageKind();
 
@@ -43,7 +43,7 @@ public static class Paths
         else if (!string.IsNullOrWhiteSpace(PackageKind) || !_CanWriteDirectory(DefaultDirectory))
             _data = Path.Combine(
                 Environment.GetFolderPath(Special.UserProfile),
-                "PCLCE");
+                "PCL-DreamPort");
 
 #if DEBUG
         // read environment variables

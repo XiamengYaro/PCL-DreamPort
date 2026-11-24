@@ -1,3 +1,6 @@
+using DreamPort.Core.Config;
+using DreamPort.Core.Mirror;
+using PCL.Core.App;
 using PCL.Core.IO;
 
 namespace PCL;
@@ -8,13 +11,27 @@ public static class DownloadSources
     /// <summary>下载文件时是否优先使用官方源。</summary>
     public static bool PreferMojang { get; set; }
 
+    public static DreamPortDownloadSourceMode ResolveMode(bool forceOfficial = false)
+    {
+        if (forceOfficial || PreferMojang)
+            return DreamPortDownloadSourceMode.Official;
+
+        var configured = (DreamPortDownloadSourceMode)Math.Clamp(Config.Download.DreamPortSourceMode, 0, 3);
+        if (!DreamPortBuildConfig.IsMirrorEnabled
+            && configured is DreamPortDownloadSourceMode.Auto or DreamPortDownloadSourceMode.DreamPort)
+            return DreamPortDownloadSourceMode.Bmclapi;
+
+        return configured;
+    }
+
     public static IEnumerable<string> Order(
         IEnumerable<string> officialUrls,
         IEnumerable<string> mirrorUrls)
     {
-        return PreferMojang
-            ? officialUrls.Union(mirrorUrls)
-            : mirrorUrls.Union(officialUrls);
+        return DreamPortMirrorPolicy.BuildCandidateUrls(
+            officialUrls,
+            mirrorUrls,
+            ResolveMode());
     }
 
     /// <summary>读取 Forge 推荐版本缓存。</summary>

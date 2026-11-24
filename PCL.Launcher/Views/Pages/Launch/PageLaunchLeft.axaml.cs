@@ -78,7 +78,7 @@ public partial class PageLaunchLeft : MyPageLeft, IShellShortcutTarget
         ViewModel.RefreshPageRequested += OnRefreshPageRequested;
 
         ExtraButtonsPanel.AprilGiveupResetAction = ResetAprilState;
-        FileDragHandler.AuthlibServerDropped += OnAuthlibServerDropped;
+        // 仅保留正版微软登录，忽略外置验证服务器拖拽
 
         Loaded += (_, _) =>
         {

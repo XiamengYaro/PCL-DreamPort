@@ -266,10 +266,6 @@
                                          Classes="link"
                                          Margin="0,0,20,0"
                                          Text="{loc:Loc Setup.About.Legal.CommunityLobbyPrivacy}" />
-                        <ui:MyTextButton x:Name="BtnNatayarkTerms"
-                                         Classes="link"
-                                         Margin="0,0,20,0"
-                                         Text="{loc:Loc Setup.About.Legal.NatayarkTerms}" />
                     </WrapPanel>
                 </StackPanel>
             </ui:MyCard>

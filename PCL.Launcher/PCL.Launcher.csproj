@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-        <AssemblyTitle>PCL CE</AssemblyTitle>
+        <AssemblyTitle>PCL-梦港</AssemblyTitle>
         <AssemblyName>PCL.Launcher</AssemblyName>
-        <Description>PCL CE 的界面层</Description>
-        <Company>PCL Community</Company>
-        <Product>PCL CE</Product>
+        <Description>PCL-梦港界面层（基于 PCL CE 独立二次创作）</Description>
+        <Company>DreamPort Contributors</Company>
+        <Product>PCL-梦港</Product>
         <RootNamespace>PCL</RootNamespace>
         <OutputType>WinExe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
@@ -64,6 +64,8 @@
         <ProjectReference Include="..\PCL.Core.UI\PCL.Core.UI.csproj" />
         <ProjectReference Include="..\PCL.Launcher.Core\PCL.Launcher.Core.csproj" />
         <ProjectReference Include="..\PCL.Platform\PCL.Platform.csproj" />
+        <ProjectReference Include="..\DreamPort.Core\DreamPort.Core.csproj" />
+        <ProjectReference Include="..\DreamPort.UI\DreamPort.UI.csproj" />
     </ItemGroup>
     <Target Name="UpdateMacOsAppHostSdk"
             AfterTargets="CopyFilesToOutputDirectory"
