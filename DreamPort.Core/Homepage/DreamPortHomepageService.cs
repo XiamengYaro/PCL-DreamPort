@@ -23,6 +23,10 @@ public static class DreamPortHomepageService
         return resolvedBase + "/api/client/pcl-homepage";
     }
 
+    /// <summary>拼装服务端主页版本探测接口地址（对齐 HomepageContent.VersionAddress）。</summary>
+    public static string GetRemoteVersionUrl(string? baseUrl = null)
+        => GetRemoteHomepageUrl(baseUrl) + "/version";
+
     private static string LoadPrototypeXaml()
     {
         var assembly = typeof(DreamPortHomepageService).Assembly;

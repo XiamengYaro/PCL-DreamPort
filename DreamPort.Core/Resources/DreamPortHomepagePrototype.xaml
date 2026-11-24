@@ -2,11 +2,11 @@
             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
             xmlns:local="clr-namespace:PCL;assembly=Plain Craft Launcher 2">
     <local:MyHint Margin="0,0,0,15" IsWarn="False"
-                  Text="欢迎使用 PCL-梦港（PCL-DreamPort PoC 原型）。本主页由 PCL 原生 XAML 渲染器承载，Phase 2 起将由 DreamPort 后端动态推送更新。" />
+                  Text="欢迎使用 PCL-梦港！当前主页优先拉取 DreamPort 站点推送的动态主页，并在离线或未配置时自动回退至本内置页面。" />
     <local:MyCard Title="夏日小镇 · DreamPort" Margin="0,0,0,15">
         <StackPanel Margin="25,40,23,15">
             <TextBlock TextWrapping="Wrap" Margin="0,0,0,10"
-                       Text="欢迎来到梦港！您可以在「工具 → 梦港账号」通过浏览器授权登录站点账号，在「启动 → 微软登录」绑定并选择正版账号。" />
+                       Text="您可以在「工具 → 梦港账号」通过浏览器授权登录站点账号、管理登录设备并完成入服引导；在「启动 → 微软登录」选择正版角色后即可在梦港账号页一键完成正版 ID 验证。" />
             <StackPanel Orientation="Horizontal">
                 <local:MyButton Padding="13,6" Margin="0,0,10,0" ColorType="Highlight"
                                 Text="打开梦港网页端" EventType="打开网页" EventData="https://xmcraft.cn" />

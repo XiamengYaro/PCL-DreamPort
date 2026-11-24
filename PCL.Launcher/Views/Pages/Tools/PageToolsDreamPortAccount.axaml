@@ -19,7 +19,7 @@
                 <StackPanel Margin="25,40,25,20"
                             Spacing="10">
                     <TextBlock TextWrapping="Wrap"
-                               Text="用于通过浏览器授权登录夏镇梦港站点账号及拉取服务端推送的 PCL 原生自定义主页（支持环境或本机自定义地址）。" />
+                               Text="用于通过浏览器授权登录夏镇梦港站点账号、同步六步入服流程与多设备会话，并拉取服务端推送的 PCL 原生自定义主页（切换站点将先注销旧站点会话）。" />
                     <Grid ColumnDefinitions="Auto,*,Auto"
                           ColumnSpacing="14">
                         <TextBlock Grid.Column="0"
@@ -33,8 +33,19 @@
                                      Height="35"
                                      Command="{Binding CheckServerCommand}"
                                      IsEnabled="{Binding IsNotBusy}"
-                                     Text="检测连通性" />
+                                     Text="检测并切换" />
                     </Grid>
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10">
+                        <ui:MyButton MinWidth="120"
+                                     Height="32"
+                                     Command="{Binding OpenRegisterInBrowserCommand}"
+                                     Text="前往网页注册" />
+                        <ui:MyButton MinWidth="120"
+                                     Height="32"
+                                     Command="{Binding OpenSecuritySettingsInBrowserCommand}"
+                                     Text="打开网页控制台" />
+                    </StackPanel>
                 </StackPanel>
             </ui:MyCard>
 
@@ -134,6 +145,10 @@
                                      Command="{Binding ValidateAndRefreshProfileCommand}"
                                      IsEnabled="{Binding IsNotBusy}"
                                      Text="校验并刷新资料" />
+                        <ui:MyButton MinWidth="130"
+                                     Height="35"
+                                     Command="{Binding OpenSecuritySettingsInBrowserCommand}"
+                                     Text="安全与通行密钥" />
                         <ui:MyButton MinWidth="100"
                                      Height="35"
                                      ColorType="Red"
@@ -145,11 +160,361 @@
             </ui:MyCard>
 
             <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding ShowEntryFlowCard}"
+                       Title="入服引导与账号验证（六步流程）">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="14">
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="14">
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="{Binding ProgressSummaryText}" />
+                            <TextBlock Text="{Binding QqBindModeText}" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding StepItems}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="dpvm:DreamPortProgressStepVm">
+                                    <Border Margin="0,6,8,0"
+                                            Padding="10,6"
+                                            BorderBrush="{DynamicResource ColorBrushGray4}"
+                                            BorderThickness="1"
+                                            CornerRadius="5">
+                                        <TextBlock FontSize="12"
+                                                   Text="{Binding DetailText}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <Border IsVisible="{Binding IsBanned}"
+                            BorderBrush="{DynamicResource ColorBrushGray4}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12">
+                        <StackPanel Spacing="8">
+                            <TextBlock FontWeight="Bold"
+                                       Text="账号当前处于封禁状态" />
+                            <TextBlock TextWrapping="Wrap"
+                                       Text="{Binding BanDetailText}" />
+                            <StackPanel Orientation="Horizontal">
+                                <ui:MyButton MinWidth="140"
+                                             Height="34"
+                                             ColorType="Red"
+                                             Command="{Binding OpenBanAppealInBrowserCommand}"
+                                             Text="前往网页封禁申诉" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsRejected}"
+                            BorderBrush="{DynamicResource ColorBrushGray4}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12">
+                        <StackPanel Spacing="10">
+                            <TextBlock FontWeight="Bold"
+                                       Text="入服审核未通过 / 问卷申诉" />
+                            <TextBlock IsVisible="{Binding HasAppealStatus}"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding AppealStatusText}" />
+                            <ui:MyTextBox AcceptsReturn="True"
+                                          MinHeight="66"
+                                          TextWrapping="Wrap"
+                                          HintText="请填写申诉理由（至少 10 个字，说明具体题目或误判情况）"
+                                          IsEnabled="{Binding CanSubmitAppeal}"
+                                          Text="{Binding AppealReasonInput, Mode=TwoWay}" />
+                            <StackPanel Orientation="Horizontal">
+                                <ui:MyButton MinWidth="130"
+                                             Height="34"
+                                             ColorType="Highlight"
+                                             Command="{Binding SubmitAppealCommand}"
+                                             IsEnabled="{Binding CanSubmitAppeal}"
+                                             Text="提交人工复核申诉" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border BorderBrush="{DynamicResource ColorBrushGray4}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12">
+                        <StackPanel Spacing="8">
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="步骤 2 · QQ 账号绑定" />
+                            <TextBlock TextWrapping="Wrap"
+                                       Text="{Binding QqStatusSummary}" />
+                            <TextBlock IsVisible="{Binding HasQqUnavailableHint}"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding QqUnavailableHint}" />
+                            <Grid ColumnDefinitions="*,Auto,Auto"
+                                  ColumnSpacing="10">
+                                <ui:MyTextBox Grid.Column="0"
+                                              HintText="输入从机器人私聊获得的 QQ 绑定验证码"
+                                              IsEnabled="{Binding CanBindQq}"
+                                              Text="{Binding QqBindCodeInput, Mode=TwoWay}" />
+                                <ui:MyButton Grid.Column="1"
+                                             MinWidth="100"
+                                             Height="34"
+                                             ColorType="Highlight"
+                                             Command="{Binding BindQqCommand}"
+                                             IsEnabled="{Binding CanBindQq}"
+                                             Text="验证绑定" />
+                                <ui:MyButton Grid.Column="2"
+                                             MinWidth="90"
+                                             Height="34"
+                                             ColorType="Red"
+                                             IsVisible="{Binding IsQqBound}"
+                                             Command="{Binding UnbindQqCommand}"
+                                             IsEnabled="{Binding CanUnbindQq}"
+                                             Text="解绑 QQ" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel IsVisible="{Binding ShowVerificationSections}"
+                                Spacing="14">
+                        <Border BorderBrush="{DynamicResource ColorBrushGray4}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12">
+                            <StackPanel Spacing="8">
+                                <TextBlock FontWeight="SemiBold"
+                                           Text="步骤 3 · Minecraft 正版 ID 验证" />
+                                <TextBlock TextWrapping="Wrap"
+                                           Text="{Binding McStatusSummary}" />
+                                <TextBlock FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding ActiveMcProfileHint}" />
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="10">
+                                    <ui:MyButton MinWidth="180"
+                                                 Height="34"
+                                                 ColorType="Highlight"
+                                                 Command="{Binding VerifyMinecraftWithCurrentProfileCommand}"
+                                                 IsEnabled="{Binding IsNotBusy}"
+                                                 Text="使用当前正版档案一键验证" />
+                                    <ui:MyButton MinWidth="140"
+                                                 Height="34"
+                                                 IsVisible="{Binding IsMsaFallbackEnabled}"
+                                                 Command="{Binding StartMsaVerifyCommand}"
+                                                 IsEnabled="{Binding IsNotBusy}"
+                                                 Text="微软设备码备用验证" />
+                                </StackPanel>
+
+                                <Border IsVisible="{Binding IsWaitingMsaVerify}"
+                                        Margin="0,4,0,0"
+                                        BorderBrush="{DynamicResource ColorBrushGray4}"
+                                        BorderThickness="1"
+                                        CornerRadius="5"
+                                        Padding="10">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock FontWeight="Bold"
+                                                   Text="{Binding MsaWaitHint}" />
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="10">
+                                            <ui:MyTextBox Width="180"
+                                                          IsReadOnly="True"
+                                                          Text="{Binding MsaUserCode}" />
+                                            <ui:MyButton MinWidth="120"
+                                                         Height="32"
+                                                         Command="{Binding ReopenMsaBrowserCommand}"
+                                                         Text="打开微软验证页" />
+                                            <ui:MyButton MinWidth="90"
+                                                         Height="32"
+                                                         Command="{Binding CancelMsaVerifyCommand}"
+                                                         Text="取消验证" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <Border BorderBrush="{DynamicResource ColorBrushGray4}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="12">
+                            <StackPanel Spacing="10">
+                                <TextBlock FontWeight="SemiBold"
+                                           Text="步骤 4 · 邀请码或 AI 评分入服问卷" />
+                                <Grid ColumnDefinitions="*,Auto"
+                                      ColumnSpacing="10">
+                                    <ui:MyTextBox Grid.Column="0"
+                                                  HintText="如果有老玩家邀请码，可在此直接填写"
+                                                  IsEnabled="{Binding IsNotBusy}"
+                                                  Text="{Binding InviteCodeInput, Mode=TwoWay}" />
+                                    <ui:MyButton Grid.Column="1"
+                                                 MinWidth="120"
+                                                 Height="34"
+                                                 Command="{Binding ApplyInviteCodeCommand}"
+                                                 IsEnabled="{Binding IsNotBusy}"
+                                                 Text="使用邀请码" />
+                                </Grid>
+
+                                <TextBlock TextWrapping="Wrap"
+                                           Text="{Binding QuestionnaireHintText}" />
+
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="10">
+                                    <ui:MyButton MinWidth="130"
+                                                 Height="34"
+                                                 Command="{Binding LoadQuestionnaireCommand}"
+                                                 IsEnabled="{Binding IsNotBusy}"
+                                                 Text="加载入服问卷" />
+                                    <ui:MyButton MinWidth="160"
+                                                 Height="34"
+                                                 ColorType="Highlight"
+                                                 IsVisible="{Binding HasQuestionnaireQuestions}"
+                                                 Command="{Binding SubmitQuestionnaireCommand}"
+                                                 IsEnabled="{Binding IsNotBusy}"
+                                                 Text="提交问卷（实时评分）" />
+                                </StackPanel>
+
+                                <ItemsControl IsVisible="{Binding HasQuestionnaireQuestions}"
+                                              ItemsSource="{Binding Questions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="dpvm:DreamPortQuestionVm">
+                                            <Border Margin="0,6,0,0"
+                                                    BorderBrush="{DynamicResource ColorBrushGray4}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="5"
+                                                    Padding="10">
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               TextWrapping="Wrap"
+                                                               Text="{Binding HeaderText}" />
+                                                    <TextBlock FontSize="12"
+                                                               Text="{Binding ConstraintText}" />
+                                                    <ui:MyTextBox IsVisible="{Binding IsTextQuestion}"
+                                                                  AcceptsReturn="{Binding Multiline}"
+                                                                  TextWrapping="Wrap"
+                                                                  HintText="{Binding Placeholder}"
+                                                                  Text="{Binding AnswerText, Mode=TwoWay}" />
+                                                    <ItemsControl IsVisible="{Binding IsChoiceQuestion}"
+                                                                  ItemsSource="{Binding Options}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="dpvm:DreamPortQuestionOptionVm">
+                                                                <ui:MyCheckBox Margin="0,4,0,2"
+                                                                               Checked="{Binding IsChecked, Mode=TwoWay}"
+                                                                               Text="{Binding Text}" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <ItemsControl IsVisible="{Binding HasScoreFeedbacks}"
+                                              ItemsSource="{Binding ScoreFeedbacks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="dpvm:DreamPortScoreFeedbackVm">
+                                            <Border Margin="0,4,0,0"
+                                                    BorderBrush="{DynamicResource ColorBrushGray4}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="4"
+                                                    Padding="8">
+                                                <StackPanel Spacing="2">
+                                                    <StackPanel Orientation="Horizontal"
+                                                                Spacing="10">
+                                                        <TextBlock FontWeight="SemiBold"
+                                                                   Text="{Binding HeaderText}" />
+                                                        <TextBlock Text="{Binding ScoreText}" />
+                                                    </StackPanel>
+                                                    <TextBlock FontSize="12"
+                                                               TextWrapping="Wrap"
+                                                               Text="{Binding ReasonText}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Border IsVisible="{Binding HasQuestionnaireSummary}"
+                                        BorderBrush="{DynamicResource ColorBrushGray4}"
+                                        BorderThickness="1"
+                                        CornerRadius="5"
+                                        Padding="10">
+                                    <TextBlock TextWrapping="Wrap"
+                                               Text="{Binding QuestionnaireSummaryText}" />
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </ui:MyCard>
+
+            <ui:MyCard Margin="0,0,0,15"
+                       CanSwap="True"
+                       IsVisible="{Binding IsLoggedIn}"
+                       Title="已登录设备管理">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="10">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="{Binding SessionsSummaryText}" />
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10">
+                        <ui:MyButton MinWidth="120"
+                                     Height="34"
+                                     Command="{Binding RefreshSessionsCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="刷新设备列表" />
+                        <ui:MyButton MinWidth="150"
+                                     Height="34"
+                                     ColorType="Red"
+                                     IsVisible="{Binding CanManageSessions}"
+                                     Command="{Binding RevokeOtherSessionsCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="踢掉其它全部设备" />
+                    </StackPanel>
+
+                    <ItemsControl IsVisible="{Binding HasSessions}"
+                                  ItemsSource="{Binding SessionItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="dpvm:DreamPortSessionItemVm">
+                                <Border Margin="0,6,0,0"
+                                        BorderBrush="{DynamicResource ColorBrushGray4}"
+                                        BorderThickness="1"
+                                        CornerRadius="5"
+                                        Padding="10">
+                                    <Grid ColumnDefinitions="*,Auto"
+                                          ColumnSpacing="12">
+                                        <StackPanel Grid.Column="0"
+                                                    Spacing="4">
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Text="{Binding HeaderText}" />
+                                            <TextBlock FontSize="12"
+                                                       TextWrapping="Wrap"
+                                                       Text="{Binding MetaText}" />
+                                        </StackPanel>
+                                        <ui:MyButton Grid.Column="1"
+                                                     MinWidth="86"
+                                                     Height="32"
+                                                     ColorType="Red"
+                                                     IsVisible="{Binding CanRevoke}"
+                                                     Command="{Binding RevokeCommand}"
+                                                     Text="踢下线" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ui:MyCard>
+
+            <ui:MyCard Margin="0,0,0,15"
+                       CanSwap="True"
                        Title="PCL 原生自定义主页来源">
                 <StackPanel Margin="25,40,25,20"
                             Spacing="10">
                     <TextBlock TextWrapping="Wrap"
-                               Text="默认优先请求站点的 /api/client/pcl-homepage，若后端尚未部署或离线则静默回退到内置原型 XAML。" />
+                               Text="默认优先请求站点的 /api/client/pcl-homepage（先通过 /version 检测版本变更，仅在更新时拉取），不可达或离线时静默回退内置主页。" />
                     <Grid ColumnDefinitions="*,Auto"
                           ColumnSpacing="14">
                         <ui:MyComboBox Grid.Column="0"
