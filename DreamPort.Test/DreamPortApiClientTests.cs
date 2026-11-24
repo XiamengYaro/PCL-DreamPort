@@ -197,6 +197,38 @@ public sealed class DreamPortApiClientTests
     }
 
     [TestMethod]
+    public async Task GetLobbyConfigAsync_ParsesRelayConfig()
+    {
+        var handler = new StubHttpHandler((req, _) =>
+        {
+            Assert.AreEqual("/api/lobby/config", req.RequestUri!.AbsolutePath);
+            Assert.AreEqual("tok-1", req.Headers.Authorization?.Parameter);
+            return Task.FromResult(JsonResponse(HttpStatusCode.OK, new
+            {
+                success = true,
+                data = new
+                {
+                    enabled = true,
+                    relayHost = "relay.xmcraft.cn",
+                    relayPort = 443,
+                    relayTls = true,
+                    maxPlayersPerRoom = 8
+                }
+            }));
+        });
+
+        using var api = new DreamPortApiClient("https://xmcraft.cn", handler, disposeHandler: true);
+        api.SetToken("tok-1");
+        var lobby = await api.GetLobbyConfigAsync();
+        Assert.IsNotNull(lobby);
+        Assert.IsTrue(lobby.Enabled);
+        Assert.AreEqual("relay.xmcraft.cn", lobby.RelayHost);
+        Assert.AreEqual(443, lobby.RelayPort);
+        Assert.IsTrue(lobby.RelayTls);
+        Assert.AreEqual(8, lobby.MaxPlayersPerRoom);
+    }
+
+    [TestMethod]
     public async Task ValidateSession_DistinguishesNetworkVsExpired_AndRenewsOn401()
     {
         var networkDown = new StubHttpHandler((_, _) => throw new HttpRequestException("DNS timeout"));

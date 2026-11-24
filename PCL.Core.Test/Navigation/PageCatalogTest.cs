@@ -11,7 +11,7 @@ public sealed class PageCatalogTest
     public void CatalogShouldContainAllFeaturePages()
     {
         Assert.HasCount(11, PageCatalog.Pages);
-        Assert.AreEqual(45, PageCatalog.Pages.Sum(page => page.SubPages.Count));
+        Assert.AreEqual(44, PageCatalog.Pages.Sum(page => page.SubPages.Count));
     }
 
     [TestMethod]
@@ -42,7 +42,7 @@ public sealed class PageCatalogTest
     public void SetupSubPagesShouldHaveUniqueIdsAndOrders()
     {
         var setup = PageCatalog.RequirePage(PageIds.Setup);
-        Assert.HasCount(11, setup.SubPages);
+        Assert.HasCount(10, setup.SubPages);
         Assert.HasCount(
             setup.SubPages.Count,
             setup

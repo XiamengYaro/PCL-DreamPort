@@ -145,7 +145,6 @@ public sealed class PlatformArchitectureTest
         var projectRoot = Path.Combine(root, "PCL.Core");
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "Link/Scaffolding/EasyTier/EasyTierPlatform.cs",
             "Platform/PlatformDetector.cs",
             "Platform/PlatformKind.cs",
             "Platform/PlatformModule.cs"
@@ -178,11 +177,6 @@ public sealed class PlatformArchitectureTest
                 "*.cs",
                 SearchOption.AllDirectories)
             where !IsBuildOutput(file)
-            where !file.Contains(
-                $"{Path.DirectorySeparatorChar}"
-                + $"Link{Path.DirectorySeparatorChar}"
-                + $"Scaffolding{Path.DirectorySeparatorChar}"
-                + $"EasyTier{Path.DirectorySeparatorChar}")
             where File.ReadAllText(file).Contains("PlatformKind", StringComparison.Ordinal)
             select Path.GetRelativePath(root, file)).ToList();
 

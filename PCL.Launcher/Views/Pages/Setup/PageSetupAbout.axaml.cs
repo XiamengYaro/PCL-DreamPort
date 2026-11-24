@@ -32,8 +32,6 @@ public partial class PageSetupAbout : MyPageRight
             Basics.OpenPath("https://github.com/PCL-Community/PCL2-CE/graphs/contributors");
         BtnCommunitySource.Click +=
             (_, _) => Basics.OpenPath("https://github.com/PCL-Community/PCL2-CE");
-        BtnCommunityLobbyPrivacy.Click += (_, _) =>
-            Basics.OpenPath("https://www.pclc.cc/privacy/personal-info-brief.html");
         BtnUpstreamTerms.Click +=
             (_, _) => Basics.OpenPath("https://shimo.im/docs/rGrd8pY8xWkt6ryW");
         BtnUpstreamSource.Click += (_, _) => Basics.OpenPath("https://github.com/Meloong-Git/PCL");
@@ -41,7 +39,6 @@ public partial class PageSetupAbout : MyPageRight
         BtnMcmod.Click += (_, _) => Basics.OpenPath("https://www.mcmod.cn");
         BtnPysioBlog.Click += (_, _) => Basics.OpenPath("https://www.pysio.online");
         BtnYunmoanWebsite.Click += (_, _) => Basics.OpenPath("https://www.zyghit.cn");
-        BtnEasyTierWebsite.Click += (_, _) => Basics.OpenPath("https://easytier.cn");
 
         Loaded += (_, _) =>
         {

@@ -62,7 +62,15 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 
     public bool IsNotLoggedIn => !IsLoggedIn;
 
+    public bool IsNotBusy => !IsBusy;
+
+    public bool IsNotStatusError => !IsStatusError;
+
     partial void OnIsLoggedInChanged(bool value) => OnPropertyChanged(nameof(IsNotLoggedIn));
+
+    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(IsNotBusy));
+
+    partial void OnIsStatusErrorChanged(bool value) => OnPropertyChanged(nameof(IsNotStatusError));
 
     public async Task InitializeAsync()
     {

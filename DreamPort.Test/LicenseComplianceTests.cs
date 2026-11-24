@@ -84,7 +84,11 @@ public sealed class LicenseComplianceTests
         {
             Path.Combine(root, "README.md"),
             Path.Combine(root, "NOTICE"),
-            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortAccount.cs")
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortAccount.axaml"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortAccount.axaml.cs"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsGameLink.axaml"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsGameLink.axaml.cs"),
+            Path.Combine(root, "PCL.Launcher", "ViewModels", "Pages", "PageToolsGameLinkViewModel.cs")
         };
 
         foreach (var dirName in new[] { "DreamPort.Core", "DreamPort.UI", "DreamPort.Test" })
@@ -110,6 +114,43 @@ public sealed class LicenseComplianceTests
             Assert.IsFalse(
                 ContainsColorEmoji(content, out var offense),
                 $"文件 {Path.GetRelativePath(root, file)} 包含禁止的彩色 emoji：{offense}");
+        }
+    }
+
+    [TestMethod]
+    public void NoEasyTierOrNatayarkLeftInSource()
+    {
+        var root = FindRepoRoot();
+        var forbiddenTokens = new[] { "Natayark", "naids.com", "EasyTier", "Scaffolding" };
+        var projects = new[] { "PCL.Core", "PCL.Launcher.Core", "PCL.Launcher", "DreamPort.Core", "DreamPort.UI" };
+
+        foreach (var project in projects)
+        {
+            var dir = Path.Combine(root, project);
+            foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+            {
+                var rel = Path.GetRelativePath(dir, file);
+                if (rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    .Any(seg => seg is "bin" or "obj"))
+                {
+                    continue;
+                }
+
+                var ext = Path.GetExtension(file);
+                if (!ext.Equals(".cs", StringComparison.OrdinalIgnoreCase)
+                    && !ext.Equals(".axaml", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var content = File.ReadAllText(file, Encoding.UTF8);
+                foreach (var token in forbiddenTokens)
+                {
+                    Assert.IsFalse(
+                        content.Contains(token, StringComparison.OrdinalIgnoreCase),
+                        $"源码文件 {Path.GetRelativePath(root, file)} 仍残留禁用标识 {token}");
+                }
+            }
         }
     }
 

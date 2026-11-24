@@ -22,6 +22,6 @@ PCL Community Edition (PCL CE) 独立二次创作的衍生修改版，与龙腾�
    - 隔离下载层 User-Agent，并保留梦港更新等配套服务加速地址配置（dl.xmcraft.cn）；游戏数据下载沿用 PCL 原生来源；
    - 接入 DreamPort 浏览器确认登录原型（兼容手机扫码）与 PCL 原生自定义主页原型；
    - 仅保留微软正版游戏账号登录并增加设备码二维码展示；
-   - 移除 Natayark ID 登录门控，保留 EasyTier 联机能力；
+   - 完全移除 EasyTier 与 Natayark ID 联机模块、配置与本地回调服务，仅保留梦港联机（TCP/TLS 中继）入口与局域网广播发现；
    - 禁用向上游 Sentry 的遥测上报与上游联机统计上报；
    - 隔离应用标识与本地数据存储目录，不覆盖原有 PCL CE 配置。

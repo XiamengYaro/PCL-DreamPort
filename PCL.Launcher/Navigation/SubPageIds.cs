@@ -54,7 +54,6 @@ public static class SubPageIds
     public static readonly SubPageId SetupAbout = new(PageIds.Setup, "SetupAbout");
     public static readonly SubPageId SetupLog = new(PageIds.Setup, "SetupLog");
     public static readonly SubPageId SetupFeedback = new(PageIds.Setup, "SetupFeedback");
-    public static readonly SubPageId SetupGameLink = new(PageIds.Setup, "SetupGameLink");
     public static readonly SubPageId SetupUpdate = new(PageIds.Setup, "SetupUpdate");
     public static readonly SubPageId SetupJava = new(PageIds.Setup, "SetupJava");
     public static readonly SubPageId SetupLauncherMisc = new(PageIds.Setup, "SetupLauncherMisc");

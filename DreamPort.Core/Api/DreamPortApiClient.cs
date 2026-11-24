@@ -335,6 +335,27 @@ public sealed class DreamPortApiClient : IDisposable
             CheckinStreak: GetInt(data, "checkinStreak"));
     }
 
+    public async Task<DreamPortLobbyConfigResult?> GetLobbyConfigAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return null;
+
+        var res = await SendAsync(HttpMethod.Get, "/api/lobby/config", auth: true, ct: ct).ConfigureAwait(false);
+        if (res.Status != 200)
+            return null;
+
+        var data = UnwrapData(res.Body);
+        if (data.ValueKind != JsonValueKind.Object)
+            return null;
+
+        return new DreamPortLobbyConfigResult(
+            Enabled: GetBool(data, "enabled"),
+            RelayHost: GetString(data, "relayHost"),
+            RelayPort: GetInt(data, "relayPort") ?? 0,
+            RelayTls: GetBool(data, "relayTls"),
+            MaxPlayersPerRoom: GetInt(data, "maxPlayersPerRoom") ?? 0);
+    }
+
     public async Task LogoutAsync(CancellationToken ct = default)
     {
         if (!string.IsNullOrEmpty(_token))

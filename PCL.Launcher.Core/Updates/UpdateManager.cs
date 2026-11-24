@@ -18,10 +18,7 @@ public static class UpdateManager
             new UpdatesMirrorChyanModel(),
             new UpdatesRandomModel(
             [
-                new UpdatesMinioModel("https://s3.pysio.online/pcl2-ce/", "Pysio"),
-                new UpdatesMinioModel(
-                    "https://staticassets.naids.com/resources/pclce/",
-                    "Naids")
+                new UpdatesMinioModel("https://s3.pysio.online/pcl2-ce/", "Pysio")
             ]),
             new UpdatesMinioModel(
                 "https://github.com/PCL-Community/PCL2_CE_Server/raw/main/",

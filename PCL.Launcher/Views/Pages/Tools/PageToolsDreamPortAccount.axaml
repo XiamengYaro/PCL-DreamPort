@@ -1,0 +1,173 @@
+<ui:MyPageRight xmlns="https://github.com/avaloniaui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:dpvm="using:DreamPort.UI.ViewModels"
+                xmlns:ui="using:PCL.UI.Controls"
+                x:DataType="dpvm:DreamPortAccountViewModel"
+                x:CompileBindings="True"
+                x:Class="PCL.Views.Pages.Tools.PageToolsDreamPortAccount">
+    <ui:MyScrollViewer x:Name="PanBack"
+                       HorizontalScrollBarVisibility="Disabled"
+                       VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="25,10">
+            <ui:MyHint x:Name="HintStatus"
+                       Margin="0,15,0,0"
+                       Theme="Blue"
+                       Text="{Binding StatusMessage}" />
+
+            <ui:MyCard Margin="0,15"
+                       Title="DreamPort 服务地址">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="10">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="用于通过浏览器授权登录夏镇梦港站点账号及拉取服务端推送的 PCL 原生自定义主页（支持环境或本机自定义地址）。" />
+                    <Grid ColumnDefinitions="Auto,*,Auto"
+                          ColumnSpacing="14">
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Text="站点地址" />
+                        <ui:MyTextBox Grid.Column="1"
+                                      IsEnabled="{Binding IsNotBusy}"
+                                      Text="{Binding BaseUrl, Mode=TwoWay}" />
+                        <ui:MyButton Grid.Column="2"
+                                     MinWidth="110"
+                                     Height="35"
+                                     Command="{Binding CheckServerCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="检测连通性" />
+                    </Grid>
+                </StackPanel>
+            </ui:MyCard>
+
+            <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding IsNotLoggedIn}"
+                       Title="通过浏览器登录 DreamPort">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="12">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="点击下方按钮将打开 DreamPort 网页端进行安全授权确认（原生支持通行密钥、两步验证、图形验证码、账号注册与封禁说明；启动器不采集明文密码）。" />
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="12">
+                        <ui:MyButton MinWidth="150"
+                                     Height="35"
+                                     ColorType="Highlight"
+                                     Command="{Binding StartBrowserLoginCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="在浏览器中登录" />
+                    </StackPanel>
+
+                    <Border IsVisible="{Binding IsWaitingBrowserConfirm}"
+                            Margin="0,4,0,0"
+                            BorderBrush="{DynamicResource ColorBrushGray4}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="14">
+                        <Grid ColumnDefinitions="Auto,*"
+                              ColumnSpacing="16">
+                            <StackPanel Grid.Column="0"
+                                        HorizontalAlignment="Center"
+                                        Spacing="6">
+                                <Border Background="White"
+                                        CornerRadius="6"
+                                        Padding="8">
+                                    <Image Width="156"
+                                           Height="156"
+                                           Source="{Binding QrCodeBitmap}"
+                                           Stretch="Uniform" />
+                                </Border>
+                                <TextBlock FontSize="12"
+                                           HorizontalAlignment="Center"
+                                           Text="也可用已登录的手机扫码确认" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1"
+                                        Spacing="10"
+                                        VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="12">
+                                    <TextBlock FontWeight="Bold"
+                                               Text="正在等待确认授权" />
+                                    <TextBlock FontWeight="SemiBold"
+                                               Text="{Binding CountdownText}" />
+                                </StackPanel>
+
+                                <TextBlock TextWrapping="Wrap"
+                                           Text="若浏览器未自动弹出或需要切换到其它浏览器，可复制下方授权链接打开：" />
+
+                                <ui:MyTextBox IsReadOnly="True"
+                                              Text="{Binding ConfirmUrl}" />
+
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="12">
+                                    <ui:MyButton MinWidth="130"
+                                                 Height="35"
+                                                 ColorType="Highlight"
+                                                 Command="{Binding ReopenBrowserCommand}"
+                                                 Text="重新打开浏览器" />
+                                    <ui:MyButton MinWidth="100"
+                                                 Height="35"
+                                                 Command="{Binding CancelBrowserLoginCommand}"
+                                                 Text="取消等待" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </ui:MyCard>
+
+            <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding IsLoggedIn}"
+                       Title="当前已登录账号">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="10">
+                    <TextBlock FontSize="16"
+                               FontWeight="Bold"
+                               Text="{Binding LoggedInUsername}" />
+                    <TextBlock LineHeight="20"
+                               TextWrapping="Wrap"
+                               Text="{Binding AccountMetaSummary}" />
+                    <StackPanel Margin="0,4,0,0"
+                                Orientation="Horizontal"
+                                Spacing="12">
+                        <ui:MyButton MinWidth="130"
+                                     Height="35"
+                                     ColorType="Highlight"
+                                     Command="{Binding ValidateAndRefreshProfileCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="校验并刷新资料" />
+                        <ui:MyButton MinWidth="100"
+                                     Height="35"
+                                     ColorType="Red"
+                                     Command="{Binding LogoutCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="退出登录" />
+                    </StackPanel>
+                </StackPanel>
+            </ui:MyCard>
+
+            <ui:MyCard Margin="0,0,0,15"
+                       Title="PCL 原生自定义主页来源">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="10">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="默认优先请求站点的 /api/client/pcl-homepage，若后端尚未部署或离线则静默回退到内置原型 XAML。" />
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="14">
+                        <ui:MyComboBox Grid.Column="0"
+                                       HorizontalAlignment="Stretch"
+                                       SelectedIndex="{Binding HomepageModeIndex, Mode=TwoWay}">
+                            <ui:MyComboBoxItem Content="远端推送优先（不可用时回退内置原型）" />
+                            <ui:MyComboBoxItem Content="仅使用内置 XAML 原型" />
+                            <ui:MyComboBoxItem Content="空白主页（关闭自定义内容）" />
+                        </ui:MyComboBox>
+                        <ui:MyButton Grid.Column="1"
+                                     MinWidth="130"
+                                     Height="35"
+                                     ColorType="Highlight"
+                                     Command="{Binding ApplyHomepageModeCommand}"
+                                     Text="应用并刷新主页" />
+                    </Grid>
+                </StackPanel>
+            </ui:MyCard>
+        </StackPanel>
+    </ui:MyScrollViewer>
+</ui:MyPageRight>

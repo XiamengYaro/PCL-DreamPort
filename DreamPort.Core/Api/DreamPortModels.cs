@@ -71,3 +71,10 @@ public sealed record DreamPortStoredSession(
     bool IsAdmin,
     bool IsTokenPersistent,
     string? Token);
+
+public sealed record DreamPortLobbyConfigResult(
+    bool Enabled,
+    string? RelayHost,
+    int RelayPort,
+    bool RelayTls,
+    int MaxPlayersPerRoom);

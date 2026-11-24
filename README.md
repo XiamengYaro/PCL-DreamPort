@@ -13,7 +13,7 @@
   - Windows 主色相锁定 PCL 蓝色系，禁用上游 Sentry 与联机遥测上报
   - 应用数据目录独立隔离为 `PCL-DreamPort`，不影响原有 PCL CE 数据
 - **仅正版游戏账号**：屏蔽离线登录与外置登录入口，保留微软正版登录并内置设备码扫描二维码
-- **联机能力**：移除 Natayark ID 门控与上游遥测，保留 `EasyTier` 联机核心开箱可用（后续阶段接入「梦港联机」TCP/TLS 中继）
+- **联机能力**：完全移除 EasyTier 与 Natayark ID 相关模块及配置，仅保留梦港联机（TCP/TLS 中继）与局域网广播发现入口（房间创建/加入/中继转发在 Phase 4 全量接入）
 - **下载与更新源分工**：游戏数据下载沿用 PCL 原生官方源 / BMCLAPI 并隔离下载层 User-Agent（`PCL-DreamPort/{version}`）；梦港加速源（`https://dl.xmcraft.cn`，`DP_UPDATE_MIRROR_URL`）仅用于启动器更新等配套服务
 - **梦港账号登录原型**：「工具 → 梦港账号」支持设置站点地址并通过浏览器确认登录（复用 `/api/qr-login/*` 授权流，支持电脑浏览器确认与同码手机扫码确认，启动器不采集明文密码）与安全存储会话
 - **PCL 原生自定义主页原型**：首次启动默认承载梦港 PCL XAML 原型，并支持对接服务端 `GET /api/client/pcl-homepage`（不可达时优雅回退本地原型）

@@ -41,16 +41,6 @@ public sealed class SetupPageModule : IPageModule
             reset: "Setup.Left.Reset.GameManage.Message"),
         Sub(
             PageIds.Setup,
-            SubPageIds.SetupGameLink,
-            "Setup.Left.Item.GameLink",
-            "lucide/bubbles",
-            "tools",
-            3,
-            (sp, _) => ActivatorUtilities.CreateInstance<PageSetupGameLink>(sp),
-            () => !Config.Preference.Hide.SetupGameLink,
-            reset: "Setup.Left.Reset.GameLink.Message"),
-        Sub(
-            PageIds.Setup,
             SubPageIds.SetupUi,
             "Setup.Left.Item.Ui",
             "lucide/palette",
@@ -129,7 +119,6 @@ public sealed class SetupPageModule : IPageModule
             SubPageIds.SetupLaunch,
             [
                 new PageGroupDescriptor("game", "Setup.Left.Category.Game", 0),
-                new PageGroupDescriptor("tools", "Setup.Left.Category.Tools", 1),
                 new PageGroupDescriptor("launcher", "Setup.Left.Category.Launcher", 2),
                 new PageGroupDescriptor("about", "Setup.Left.Category.About", 3)
             ],
