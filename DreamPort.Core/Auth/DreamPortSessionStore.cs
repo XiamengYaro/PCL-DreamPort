@@ -34,9 +34,12 @@ public sealed class DreamPortSessionStore
     public DreamPortSessionStore(string? dataDirectory = null, IDreamPortSecretVault? vault = null)
     {
         var dir = string.IsNullOrWhiteSpace(dataDirectory) ? Paths.Data : dataDirectory;
+        DataDirectory = dir;
         _sessionFilePath = Path.Combine(dir, "dreamport-session.json");
         _vault = vault ?? new OsDreamPortSecretVault();
     }
+
+    public string DataDirectory { get; }
 
     public DreamPortStoredSession Load()
     {

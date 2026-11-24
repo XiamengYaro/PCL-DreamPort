@@ -251,3 +251,110 @@ public sealed record DreamPortScoreFeedbackVm(
     string HeaderText,
     string ScoreText,
     string ReasonText);
+
+/// <summary>玩家称号选择项。</summary>
+public sealed record DreamPortTitleOption(
+    string Code,
+    string Name,
+    string Desc,
+    string Color,
+    bool IsEquipped)
+{
+    public string DisplayText => string.IsNullOrWhiteSpace(Desc)
+        ? (IsEquipped ? $"{Name}（当前佩戴）" : Name)
+        : (IsEquipped ? $"{Name}（当前佩戴）- {Desc}" : $"{Name} - {Desc}");
+
+    public override string ToString() => DisplayText;
+}
+
+/// <summary>站内通知列表项。</summary>
+public sealed partial class DreamPortNotificationItemVm : ObservableObject
+{
+    [ObservableProperty] private bool _read;
+
+    public DreamPortNotificationItemVm(
+        long id,
+        string type,
+        string title,
+        string body,
+        string? link,
+        bool read,
+        long createdAtMs,
+        bool hasSafeLink,
+        ICommand? markReadCommand,
+        ICommand? openLinkCommand)
+    {
+        Id = id;
+        Type = type;
+        Title = title;
+        Body = body;
+        Link = link;
+        _read = read;
+        CreatedAtMs = createdAtMs;
+        HasSafeLink = hasSafeLink;
+        MarkReadCommand = markReadCommand;
+        OpenLinkCommand = openLinkCommand;
+    }
+
+    public long Id { get; }
+    public string Type { get; }
+    public string Title { get; }
+    public string Body { get; }
+    public string? Link { get; }
+    public long CreatedAtMs { get; }
+    public bool HasSafeLink { get; }
+    public ICommand? MarkReadCommand { get; }
+    public ICommand? OpenLinkCommand { get; }
+
+    public bool IsUnread => !Read;
+    public bool HasBody => !string.IsNullOrWhiteSpace(Body);
+    public string HeaderText => Read ? Title : $"[未读] {Title}";
+    public string MetaText => $"{FormatTimestamp(CreatedAtMs)} · {(Read ? "已读" : "未读")}";
+
+    partial void OnReadChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsUnread));
+        OnPropertyChanged(nameof(HeaderText));
+        OnPropertyChanged(nameof(MetaText));
+    }
+
+    private static string FormatTimestamp(long ms)
+    {
+        if (ms <= 0)
+            return "刚刚";
+        try
+        {
+            return DateTimeOffset.FromUnixTimeMilliseconds(ms).ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        }
+        catch
+        {
+            return "-";
+        }
+    }
+}
+
+/// <summary>服务器公告列表项。</summary>
+public sealed record DreamPortAnnouncementItemVm(
+    string Title,
+    string Body,
+    string DateText,
+    string? Tag,
+    bool Important)
+{
+    public string HeaderText => Important ? $"[重要] {Title}" : Title;
+
+    public bool HasBody => !string.IsNullOrWhiteSpace(Body);
+
+    public string MetaText
+    {
+        get
+        {
+            var parts = new List<string>(2);
+            if (!string.IsNullOrWhiteSpace(Tag))
+                parts.Add(Tag);
+            if (!string.IsNullOrWhiteSpace(DateText))
+                parts.Add(DateText);
+            return parts.Count > 0 ? string.Join(" · ", parts) : "站点公告";
+        }
+    }
+}

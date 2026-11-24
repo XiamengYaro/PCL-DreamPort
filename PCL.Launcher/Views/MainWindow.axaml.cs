@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using DreamPort.UI.Services;
 using PCL.Core.App.IoC;
 using PCL.Core.App.Localization;
 using PCL.Core.Logging;
@@ -84,8 +85,11 @@ public partial class MainWindow : Window
         _titleBar.TabSelected += PageRouter.Navigate;
         _titleBar.BackRequested += () => PageRouter.Back();
         _titleBar.HelpRequested += OpenHelp;
+        _titleBar.NotificationsRequested += OnNotificationsRequested;
         _titleBar.MinimizeRequested += () => WindowState = WindowState.Minimized;
         _titleBar.CloseRequested += Close;
+        DreamPortShellBridge.UnreadCountChanged += OnUnreadNotificationCountChanged;
+        _titleBar.UpdateNotificationUnreadCount(DreamPortShellBridge.UnreadNotificationCount);
 
 
         Closed += (_, _) => OnClosed();
@@ -335,8 +339,20 @@ public partial class MainWindow : Window
         PageRouter.Navigated -= OnNavigated;
         PageRouter.PageHostSwapped -= OnPageHostSwapped;
         LocalizationService.LanguageChanged -= OnLanguageChangedForLeftWidth;
+        _titleBar.NotificationsRequested -= OnNotificationsRequested;
+        DreamPortShellBridge.UnreadCountChanged -= OnUnreadNotificationCountChanged;
         BackgroundHost.Detach(_background);
         _background.Remove();
+    }
+
+    private void OnUnreadNotificationCountChanged(int unread)
+    {
+        _titleBar.UpdateNotificationUnreadCount(unread);
+    }
+
+    private static void OnNotificationsRequested()
+    {
+        PageRouter.Navigate(PageIds.Tools, SubPageIds.ToolsDreamPortCommunity);
     }
 
     private void ApplyWindowIcon()

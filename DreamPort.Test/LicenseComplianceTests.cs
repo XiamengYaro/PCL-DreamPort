@@ -97,6 +97,8 @@ public sealed class LicenseComplianceTests
             Path.Combine(root, "scripts", "linux", "pcl-dreamport-appimage.desktop"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortAccount.axaml"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortAccount.axaml.cs"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortCommunity.axaml"),
+            Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortCommunity.axaml.cs"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsGameLink.axaml"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsGameLink.axaml.cs"),
             Path.Combine(root, "PCL.Launcher", "ViewModels", "Pages", "PageToolsGameLinkViewModel.cs")

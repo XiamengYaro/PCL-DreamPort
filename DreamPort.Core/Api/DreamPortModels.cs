@@ -215,3 +215,87 @@ public sealed record DreamPortAppealStatus(
     string Status,
     string AdminReply,
     long CreatedAtMs);
+
+public sealed record DreamPortSigninResult(
+    bool Ok,
+    bool First,
+    bool AlreadySigned,
+    string Message,
+    string? SignedDate,
+    int Streak,
+    int MonthDays,
+    int Total,
+    int PointsAwarded,
+    IReadOnlyList<string> Rewards,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortPointsCenterResult(
+    bool Ok,
+    int Balance,
+    bool SignedToday,
+    int Streak,
+    int MonthDays,
+    int PendingClaimCount,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortTitleItem(
+    string Code,
+    string Name,
+    string Desc,
+    string Color,
+    long? ObtainedAtMs);
+
+public sealed record DreamPortTitlesMineResult(
+    bool Ok,
+    string? EquippedCode,
+    IReadOnlyList<DreamPortTitleItem> Owned,
+    int LockedCount,
+    int CompletedAchievements,
+    int TotalAchievements,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortAnnouncementItem(
+    string Title,
+    string Body,
+    string DateText,
+    string? Tag,
+    bool Important);
+
+public sealed record DreamPortAnnouncementsResult(
+    bool Ok,
+    IReadOnlyList<DreamPortAnnouncementItem> Items,
+    string? Message = null);
+
+public sealed record DreamPortNotificationItem(
+    long Id,
+    string Type,
+    string Title,
+    string Body,
+    string? Link,
+    bool Read,
+    long? ReadAtMs,
+    long CreatedAtMs);
+
+public sealed record DreamPortNotificationListResult(
+    bool Ok,
+    IReadOnlyList<DreamPortNotificationItem> Items,
+    int Total,
+    int Unread,
+    int Page,
+    int PageSize,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortUnreadCountResult(
+    bool Ok,
+    int Unread,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortNotificationMarkReadResult(
+    bool Ok,
+    int Unread,
+    int Marked = 0,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);

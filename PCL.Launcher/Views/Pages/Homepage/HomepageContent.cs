@@ -355,6 +355,8 @@ public static class HomepageSource
                 if (content.Length > MaxContentLength)
                     throw new InvalidDataException(
                         $"下载到的主页内容过大（{content.Length} 字符，上限 {MaxContentLength} 字符）");
+                if (!PCL.Xaml.HomepageXamlFormatDetector.IsXaml(content))
+                    throw new InvalidDataException("下载到的主页内容不是有效的 XAML");
 
                 lock (CacheLock)
                 {
@@ -422,9 +424,18 @@ public static class HomepageSource
                     Timeout = 30_000,
                     Retries = 1
                 });
-            return version.Length > 1000
-                ? throw new InvalidOperationException($"获取的主页版本过长（{version.Length} 字符）")
-                : version;
+            var trimmed = version.Trim();
+            if (string.IsNullOrEmpty(trimmed)
+                || trimmed.Contains('<')
+                || trimmed.StartsWith("<!doctype", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase)
+                || trimmed.Contains('\n')
+                || trimmed.Contains('\r'))
+                return "";
+
+            return trimmed.Length > 1000
+                ? throw new InvalidOperationException($"获取的主页版本过长（{trimmed.Length} 字符）")
+                : trimmed;
         }
         catch (Exception ex)
         {

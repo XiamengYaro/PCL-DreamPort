@@ -1,0 +1,173 @@
+<ui:MyPageRight xmlns="https://github.com/avaloniaui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:dpvm="using:DreamPort.UI.ViewModels"
+                xmlns:ui="using:PCL.UI.Controls"
+                x:DataType="dpvm:DreamPortCommunityViewModel"
+                x:CompileBindings="True"
+                x:Class="PCL.Views.Pages.Tools.PageToolsDreamPortCommunity">
+    <ui:MyScrollViewer x:Name="PanBack"
+                       HorizontalScrollBarVisibility="Disabled"
+                       VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="25,10">
+            <ui:MyHint x:Name="HintStatus"
+                       Margin="0,15,0,0"
+                       Theme="Blue"
+                       Text="{Binding StatusMessage}" />
+
+            <ui:MyCard Margin="0,15"
+                       Title="站内通知中心">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="12">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="{Binding NotificationsSummaryText}" />
+
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10">
+                        <ui:MyButton MinWidth="110"
+                                     Height="34"
+                                     ColorType="Highlight"
+                                     Command="{Binding RefreshNotificationsCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="刷新通知" />
+                        <ui:MyButton MinWidth="110"
+                                     Height="34"
+                                     IsVisible="{Binding IsLoggedIn}"
+                                     Command="{Binding MarkAllReadCommand}"
+                                     IsEnabled="{Binding CanMarkAllRead}"
+                                     Text="全部已读" />
+                        <ui:MyButton MinWidth="120"
+                                     Height="34"
+                                     IsVisible="{Binding IsNotLoggedIn}"
+                                     Command="{Binding GoToAccountPageCommand}"
+                                     Text="前往梦港账号登录" />
+                        <ui:MyButton MinWidth="120"
+                                     Height="34"
+                                     Command="{Binding OpenNotificationsWebPageCommand}"
+                                     Text="网页通知中心" />
+                    </StackPanel>
+
+                    <ui:MyCheckBox IsVisible="{Binding IsLoggedIn}"
+                                   Checked="{Binding ShowUnreadOnlyChecked, Mode=TwoWay}"
+                                   Text="仅显示未读通知" />
+
+                    <TextBlock IsVisible="{Binding HasNoNotifications}"
+                               FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               TextWrapping="Wrap"
+                               Text="当前筛选条件下暂无可展示的站内通知。" />
+
+                    <ItemsControl IsVisible="{Binding HasNotifications}"
+                                  ItemsSource="{Binding VisibleNotifications}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="dpvm:DreamPortNotificationItemVm">
+                                <Border Margin="0,8,0,0"
+                                        BorderBrush="{DynamicResource ColorBrushGray4}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12">
+                                    <StackPanel Spacing="6">
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              ColumnSpacing="10">
+                                            <StackPanel Grid.Column="0"
+                                                        Spacing="2">
+                                                <TextBlock FontWeight="SemiBold"
+                                                           TextWrapping="Wrap"
+                                                           Text="{Binding HeaderText}" />
+                                                <TextBlock FontSize="12"
+                                                           Foreground="{DynamicResource ColorBrushGray4}"
+                                                           Text="{Binding MetaText}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        Spacing="8"
+                                                        VerticalAlignment="Top">
+                                                <ui:MyButton MinWidth="84"
+                                                             Height="30"
+                                                             IsVisible="{Binding IsUnread}"
+                                                             Command="{Binding MarkReadCommand}"
+                                                             Text="标记已读" />
+                                                <ui:MyButton MinWidth="84"
+                                                             Height="30"
+                                                             ColorType="Highlight"
+                                                             IsVisible="{Binding HasSafeLink}"
+                                                             Command="{Binding OpenLinkCommand}"
+                                                             Text="查看详情" />
+                                            </StackPanel>
+                                        </Grid>
+                                        <TextBlock IsVisible="{Binding HasBody}"
+                                                   LineHeight="20"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding Body}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ui:MyCard>
+
+            <ui:MyCard Margin="0,0,0,15"
+                       CanSwap="True"
+                       Title="服务器公告与资讯">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="12">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="{Binding AnnouncementsSummaryText}" />
+
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10">
+                        <ui:MyButton MinWidth="110"
+                                     Height="34"
+                                     ColorType="Highlight"
+                                     Command="{Binding RefreshAnnouncementsCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="刷新公告" />
+                        <ui:MyButton MinWidth="120"
+                                     Height="34"
+                                     Command="{Binding OpenAnnouncementsWebPageCommand}"
+                                     Text="前往官网公告页" />
+                    </StackPanel>
+
+                    <TextBlock IsVisible="{Binding HasNoAnnouncements}"
+                               FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               TextWrapping="Wrap"
+                               Text="暂无已发布的服务器公告。" />
+
+                    <ItemsControl IsVisible="{Binding HasAnnouncements}"
+                                  ItemsSource="{Binding Announcements}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="dpvm:DreamPortAnnouncementItemVm">
+                                <Border Margin="0,8,0,0"
+                                        BorderBrush="{DynamicResource ColorBrushGray4}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12">
+                                    <StackPanel Spacing="6">
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              ColumnSpacing="10">
+                                            <TextBlock Grid.Column="0"
+                                                       FontSize="14"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="Wrap"
+                                                       Text="{Binding HeaderText}" />
+                                            <TextBlock Grid.Column="1"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource ColorBrushGray4}"
+                                                       Text="{Binding MetaText}" />
+                                        </Grid>
+                                        <TextBlock IsVisible="{Binding HasBody}"
+                                                   LineHeight="20"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding Body}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ui:MyCard>
+        </StackPanel>
+    </ui:MyScrollViewer>
+</ui:MyPageRight>

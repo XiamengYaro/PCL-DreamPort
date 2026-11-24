@@ -160,6 +160,113 @@
             </ui:MyCard>
 
             <ui:MyCard Margin="0,0,0,15"
+                       CanSwap="True"
+                       IsVisible="{Binding ShowRewardsCard}"
+                       Title="每日签到 · 积分与称号">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="10">
+                    <Grid ColumnDefinitions="Auto,*,Auto,*"
+                          RowDefinitions="Auto,Auto"
+                          ColumnSpacing="14"
+                          RowSpacing="8">
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="0"
+                                   Foreground="{DynamicResource ColorBrushGray4}"
+                                   Text="站点积分" />
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="1"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding PointsBalanceText}" />
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="2"
+                                   Foreground="{DynamicResource ColorBrushGray4}"
+                                   Text="今日签到" />
+                        <TextBlock Grid.Row="0"
+                                   Grid.Column="3"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding SigninStatusText}" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="0"
+                                   Foreground="{DynamicResource ColorBrushGray4}"
+                                   Text="签到统计" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="1"
+                                   Text="{Binding SigninStreakText}" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="2"
+                                   Foreground="{DynamicResource ColorBrushGray4}"
+                                   Text="任务奖励" />
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="3"
+                                   Text="{Binding PendingTasksText}" />
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10">
+                        <ui:MyButton MinWidth="110"
+                                     Height="34"
+                                     ColorType="Highlight"
+                                     Command="{Binding ManualSigninCommand}"
+                                     IsEnabled="{Binding CanManualSignin}"
+                                     Text="立即签到" />
+                        <ui:MyButton MinWidth="120"
+                                     Height="34"
+                                     Command="{Binding RefreshRewardsAndTitlesCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="刷新积分与称号" />
+                        <ui:MyButton MinWidth="120"
+                                     Height="34"
+                                     Command="{Binding OpenTasksCenterCommand}"
+                                     Text="打开任务中心" />
+                    </StackPanel>
+
+                    <Border Margin="0,4,0,0"
+                            BorderBrush="{DynamicResource ColorBrushGray4}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12">
+                        <StackPanel Spacing="8">
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="{Binding EquippedTitleText, StringFormat='当前佩戴称号：{0}'}" />
+                            <Grid IsVisible="{Binding HasOwnedTitles}"
+                                  ColumnDefinitions="*,Auto,Auto"
+                                  ColumnSpacing="10">
+                                <ui:MyComboBox Grid.Column="0"
+                                               HorizontalAlignment="Stretch"
+                                               ItemsSource="{Binding OwnedTitles}"
+                                               SelectedItem="{Binding SelectedTitleOption, Mode=TwoWay}">
+                                    <ui:MyComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="dpvm:DreamPortTitleOption">
+                                            <TextBlock Text="{Binding DisplayText}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </DataTemplate>
+                                    </ui:MyComboBox.ItemTemplate>
+                                </ui:MyComboBox>
+                                <ui:MyButton Grid.Column="1"
+                                             MinWidth="96"
+                                             Height="34"
+                                             ColorType="Highlight"
+                                             Command="{Binding ApplySelectedTitleCommand}"
+                                             IsEnabled="{Binding CanApplySelectedTitle}"
+                                             Text="佩戴称号" />
+                                <ui:MyButton Grid.Column="2"
+                                             MinWidth="96"
+                                             Height="34"
+                                             Command="{Binding UnequipTitleCommand}"
+                                             IsEnabled="{Binding CanUnequipTitle}"
+                                             Text="卸下称号" />
+                            </Grid>
+                            <TextBlock IsVisible="{Binding !HasOwnedTitles}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource ColorBrushGray4}"
+                                       TextWrapping="Wrap"
+                                       Text="暂无已获得的称号，可通过完成每日签到、成就或前往任务兑换中心获取。" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ui:MyCard>
+
+            <ui:MyCard Margin="0,0,0,15"
                        IsVisible="{Binding ShowEntryFlowCard}"
                        Title="入服引导与账号验证（六步流程）">
                 <StackPanel Margin="25,40,25,20"

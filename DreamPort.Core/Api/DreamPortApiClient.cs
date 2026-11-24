@@ -1,16 +1,18 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using DreamPort.Core.Config;
 
 namespace DreamPort.Core.Api;
 
 /// <summary>
-/// DreamPort 站点 API 客户端（浏览器授权登录 / 会话与设备管理 / 六步入服引导流程 / AI 问卷 SSE）。
+/// DreamPort 站点 API 客户端（浏览器授权登录 / 会话与设备管理 / 六步入服引导流程 / AI 问卷 SSE / 签到称号公告通知）。
 /// 严格区分会话过期（401 -> Expired）与网络错误（Status=0 -> Network）。
 /// </summary>
-public sealed class DreamPortApiClient : IDisposable
+public sealed partial class DreamPortApiClient : IDisposable
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan QuestionnaireStreamTimeout = TimeSpan.FromMinutes(5);
@@ -869,6 +871,397 @@ public sealed class DreamPortApiClient : IDisposable
         SetToken(null);
     }
 
+    public async Task<DreamPortPointsCenterResult> GetPointsCenterAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortPointsCenterResult(false, 0, false, 0, 0, 0, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Get, "/api/points/center", auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取积分与签到信息失败", out var reason, out var error))
+            return new DreamPortPointsCenterResult(false, 0, false, 0, 0, 0, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var balance = GetInt(data, "balance") ?? 0;
+
+        var signedToday = false;
+        var streak = 0;
+        var monthDays = 0;
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("signin", out var signinEl)
+            && signinEl.ValueKind == JsonValueKind.Object)
+        {
+            signedToday = GetBool(signinEl, "today");
+            streak = GetInt(signinEl, "streak") ?? 0;
+            monthDays = GetInt(signinEl, "monthDays") ?? 0;
+        }
+
+        var pendingClaim = 0;
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("tasks", out var tasksEl)
+            && tasksEl.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var group in tasksEl.EnumerateObject())
+            {
+                if (group.Value.ValueKind != JsonValueKind.Array)
+                    continue;
+                foreach (var task in group.Value.EnumerateArray())
+                {
+                    if (task.ValueKind == JsonValueKind.Object
+                        && GetBool(task, "completed")
+                        && !GetBool(task, "claimed"))
+                    {
+                        pendingClaim++;
+                    }
+                }
+            }
+        }
+
+        return new DreamPortPointsCenterResult(true, balance, signedToday, streak, monthDays, pendingClaim);
+    }
+
+    public async Task<DreamPortSigninResult> SigninAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortSigninResult(false, false, false, "未登录", null, 0, 0, 0, 0, [], DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Post, "/api/points/signin", new { }, auth: true, ct: ct).ConfigureAwait(false);
+        if (res.Status == 400)
+        {
+            var badMsg = ExtractMessage(res.Body, "每日签到失败");
+            if (badMsg.Contains("今日已签到", StringComparison.Ordinal))
+            {
+                return new DreamPortSigninResult(
+                    Ok: true,
+                    First: false,
+                    AlreadySigned: true,
+                    Message: badMsg,
+                    SignedDate: null,
+                    Streak: 0,
+                    MonthDays: 0,
+                    Total: 0,
+                    PointsAwarded: 0,
+                    Rewards: []);
+            }
+        }
+
+        if (TryClassifyFailure(res, "每日签到失败", out var reason, out var error))
+            return new DreamPortSigninResult(false, false, false, error, null, 0, 0, 0, 0, [], reason);
+
+        var data = UnwrapData(res.Body);
+        var rewards = new List<string>();
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("rewards", out var rewardsEl)
+            && rewardsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in rewardsEl.EnumerateArray())
+            {
+                var text = item.ValueKind == JsonValueKind.String ? item.GetString() : item.ToString();
+                if (!string.IsNullOrWhiteSpace(text))
+                    rewards.Add(text.Trim());
+            }
+        }
+
+        var first = GetBool(data, "first");
+        var alreadySigned = GetBool(data, "alreadySigned");
+        if (!first && !alreadySigned)
+            first = true;
+
+        var msg = FirstNonBlank(data, "message") ?? ExtractMessage(res.Body, "签到成功");
+        return new DreamPortSigninResult(
+            Ok: true,
+            First: first,
+            AlreadySigned: alreadySigned,
+            Message: msg,
+            SignedDate: FirstNonBlank(data, "signedDate"),
+            Streak: GetInt(data, "streak") ?? 0,
+            MonthDays: GetInt(data, "monthDays") ?? 0,
+            Total: GetInt(data, "total") ?? 0,
+            PointsAwarded: GetInt(data, "pointsAwarded") ?? 0,
+            Rewards: rewards);
+    }
+
+    public async Task<DreamPortTitlesMineResult> GetMyTitlesAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortTitlesMineResult(false, null, [], 0, 0, 0, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Get, "/api/titles/mine", auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取称号列表失败", out var reason, out var error))
+            return new DreamPortTitlesMineResult(false, null, [], 0, 0, 0, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var owned = new List<DreamPortTitleItem>();
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("owned", out var ownedEl)
+            && ownedEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in ownedEl.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                    continue;
+                var code = GetString(item, "code") ?? string.Empty;
+                var name = GetString(item, "name") ?? code;
+                if (string.IsNullOrWhiteSpace(code) && string.IsNullOrWhiteSpace(name))
+                    continue;
+                owned.Add(new DreamPortTitleItem(
+                    Code: code,
+                    Name: name,
+                    Desc: GetString(item, "desc") ?? string.Empty,
+                    Color: GetString(item, "color") ?? string.Empty,
+                    ObtainedAtMs: GetLong(item, "obtainedAt")));
+            }
+        }
+
+        var lockedCount = 0;
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("locked", out var lockedEl)
+            && lockedEl.ValueKind == JsonValueKind.Array)
+        {
+            lockedCount = lockedEl.GetArrayLength();
+        }
+
+        var completedAch = 0;
+        var totalAch = 0;
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("achievements", out var achEl)
+            && achEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in achEl.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                    continue;
+                totalAch++;
+                if (GetBool(item, "completed"))
+                    completedAch++;
+            }
+        }
+
+        var equipped = FirstNonBlank(data, "equipped");
+        return new DreamPortTitlesMineResult(true, equipped, owned, lockedCount, completedAch, totalAch);
+    }
+
+    public async Task<DreamPortApiActionResult> EquipTitleAsync(string code, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortApiActionResult(false, "未登录", DreamPortFailureReason.Expired);
+        if (string.IsNullOrWhiteSpace(code))
+            return new DreamPortApiActionResult(false, "请选择要佩戴的称号");
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            "/api/titles/equip",
+            new { code = code.Trim() },
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+        return ToActionResult(res, "已佩戴称号", "佩戴称号失败");
+    }
+
+    public async Task<DreamPortApiActionResult> UnequipTitleAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortApiActionResult(false, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Post, "/api/titles/unequip", new { }, auth: true, ct: ct).ConfigureAwait(false);
+        return ToActionResult(res, "已脱下称号", "脱下称号失败");
+    }
+
+    public async Task<DreamPortAnnouncementsResult> GetAnnouncementsAsync(CancellationToken ct = default)
+    {
+        var res = await SendAsync(HttpMethod.Get, "/api/announcements", auth: false, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取服务器公告失败", out _, out var error))
+            return new DreamPortAnnouncementsResult(false, [], error);
+
+        var data = UnwrapData(res.Body);
+        JsonElement listEl = default;
+        if (data.ValueKind == JsonValueKind.Object && data.TryGetProperty("news", out var newsEl))
+            listEl = newsEl;
+        else if (data.ValueKind == JsonValueKind.Array)
+            listEl = data;
+
+        var items = new List<DreamPortAnnouncementItem>();
+        if (listEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in listEl.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                    continue;
+                var title = FirstNonBlank(item, "title", "name", "version") ?? "未命名";
+                var rawBody = FirstNonBlank(item, "subtitle", "description", "content", "body") ?? string.Empty;
+                var body = StripMarkdownForPlainDisplay(rawBody);
+                var dateText = FormatAnnouncementDate(FirstNonBlankElement(item, "date", "publishAt", "time", "createdAt"));
+                var tag = ShowAnnouncementTag(FirstNonBlank(item, "tag", "category"));
+                var important = GetBool(item, "pinned")
+                    || GetBool(item, "important")
+                    || GetBool(item, "isImportant")
+                    || string.Equals(GetString(item, "priority"), "important", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(GetString(item, "level"), "important", StringComparison.OrdinalIgnoreCase);
+
+                items.Add(new DreamPortAnnouncementItem(title, body, dateText, tag, important));
+            }
+        }
+
+        return new DreamPortAnnouncementsResult(true, items);
+    }
+
+    public async Task<DreamPortNotificationListResult> GetNotificationsAsync(
+        int page = 1,
+        int size = 20,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortNotificationListResult(false, [], 0, 0, page, size, "未登录", DreamPortFailureReason.Expired);
+
+        var safePage = Math.Max(1, page);
+        var safeSize = Math.Clamp(size, 1, 50);
+        var res = await SendAsync(
+            HttpMethod.Get,
+            $"/api/notifications?page={safePage}&size={safeSize}",
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取站内通知失败", out var reason, out var error))
+            return new DreamPortNotificationListResult(false, [], 0, 0, safePage, safeSize, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var items = new List<DreamPortNotificationItem>();
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("items", out var itemsEl)
+            && itemsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var row in itemsEl.EnumerateArray())
+            {
+                if (row.ValueKind != JsonValueKind.Object)
+                    continue;
+                items.Add(new DreamPortNotificationItem(
+                    Id: GetLong(row, "id") ?? 0,
+                    Type: GetString(row, "type") ?? string.Empty,
+                    Title: FirstNonBlank(row, "title") ?? "系统通知",
+                    Body: GetString(row, "body") ?? string.Empty,
+                    Link: FirstNonBlank(row, "link"),
+                    Read: GetBool(row, "read"),
+                    ReadAtMs: GetLong(row, "readAt"),
+                    CreatedAtMs: GetLong(row, "createdAt") ?? 0));
+            }
+        }
+
+        var total = GetInt(data, "total") ?? items.Count;
+        var unread = GetInt(data, "unread") ?? items.Count(i => !i.Read);
+        var respPage = GetInt(data, "page") ?? safePage;
+        var respSize = GetInt(data, "pageSize") ?? safeSize;
+        return new DreamPortNotificationListResult(true, items, total, unread, respPage, respSize);
+    }
+
+    public async Task<DreamPortUnreadCountResult> GetUnreadNotificationCountAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortUnreadCountResult(false, 0, DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Get, "/api/notifications/unread", auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取未读通知数失败", out var reason, out _))
+            return new DreamPortUnreadCountResult(false, 0, reason);
+
+        var data = UnwrapData(res.Body);
+        var unread = Math.Max(0, GetInt(data, "unread") ?? 0);
+        return new DreamPortUnreadCountResult(true, unread);
+    }
+
+    public async Task<DreamPortNotificationMarkReadResult> MarkNotificationReadAsync(long id, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortNotificationMarkReadResult(false, 0, 0, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Post, $"/api/notifications/{id}/read", new { }, auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "标记已读失败", out var reason, out var error))
+            return new DreamPortNotificationMarkReadResult(false, 0, 0, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var unread = Math.Max(0, GetInt(data, "unread") ?? 0);
+        return new DreamPortNotificationMarkReadResult(true, unread, 1, ExtractMessage(res.Body, "已读"));
+    }
+
+    public async Task<DreamPortNotificationMarkReadResult> MarkAllNotificationsReadAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortNotificationMarkReadResult(false, 0, 0, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Post, "/api/notifications/read-all", new { }, auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "全部标记已读失败", out var reason, out var error))
+            return new DreamPortNotificationMarkReadResult(false, 0, 0, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var marked = Math.Max(0, GetInt(data, "marked") ?? 0);
+        var unread = Math.Max(0, GetInt(data, "unread") ?? 0);
+        return new DreamPortNotificationMarkReadResult(true, unread, marked, ExtractMessage(res.Body, "已全部标记已读"));
+    }
+
+    /// <summary>
+    /// 安全解析站内相对路径（如 <c>/tasks</c>）或 HTTP/HTTPS 外部链接，拒绝 <c>javascript:</c>、<c>file:</c>、<c>data:</c> 与协议相对路径。
+    /// </summary>
+    public static bool TryResolveSafeWebUrl(string baseUrl, string? link, out string resolvedUrl)
+    {
+        resolvedUrl = string.Empty;
+        if (string.IsNullOrWhiteSpace(link))
+            return false;
+
+        var trimmed = link.Trim();
+        if (trimmed.Contains('\r') || trimmed.Contains('\n') || trimmed.Contains('\0'))
+            return false;
+        if (trimmed.StartsWith("//", StringComparison.Ordinal))
+            return false;
+
+        if (!trimmed.StartsWith('/'))
+        {
+            if (trimmed.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("vbscript:", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (Uri.TryCreate(trimmed, UriKind.Absolute, out var absUri))
+            {
+                if (absUri.Scheme != Uri.UriSchemeHttp && absUri.Scheme != Uri.UriSchemeHttps)
+                    return false;
+                resolvedUrl = absUri.ToString();
+                return true;
+            }
+
+            if (trimmed.Contains(':', StringComparison.Ordinal))
+                return false;
+        }
+
+        if (!TryNormalizeBaseUrl(baseUrl, out var normalizedBase, out _))
+            return false;
+        if (!Uri.TryCreate(normalizedBase + "/", UriKind.Absolute, out var baseUri))
+            return false;
+        if (!Uri.TryCreate(baseUri, trimmed.TrimStart('/'), out var combined))
+            return false;
+        if (combined.Scheme != Uri.UriSchemeHttp && combined.Scheme != Uri.UriSchemeHttps)
+            return false;
+
+        resolvedUrl = combined.ToString();
+        return true;
+    }
+
+    /// <summary>将公告 Markdown 正文清理为适合原生 TextBlock 展示的纯文本格式。</summary>
+    public static string StripMarkdownForPlainDisplay(string? markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+            return string.Empty;
+
+        var text = markdown.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        text = MdLinkPattern().Replace(text, "$1");
+        text = MdHeadingPattern().Replace(text, string.Empty);
+        text = MdBlockquotePattern().Replace(text, string.Empty);
+        text = MdBulletPattern().Replace(text, "$1- ");
+        text = MdStrongUnderlinePattern().Replace(text, "$1");
+        text = MdEmphasisPattern().Replace(text, "$1");
+        text = MdInlineCodePattern().Replace(text, "$1");
+        text = MdMultiBlankLinesPattern().Replace(text, "\n\n");
+        return text.Trim();
+    }
+
     public void Dispose()
     {
         if (_ownsClient)
@@ -1101,6 +1494,119 @@ public sealed class DreamPortApiClient : IDisposable
         return prop.ValueKind == JsonValueKind.Number && prop.TryGetInt64(out var v) ? v : null;
     }
 
+    private static bool TryClassifyFailure(
+        ApiResponse res,
+        string errorPrefix,
+        out DreamPortFailureReason? reason,
+        out string message)
+    {
+        if (res.Status == 0)
+        {
+            reason = DreamPortFailureReason.Network;
+            message = BuildNetworkError(res, errorPrefix);
+            return true;
+        }
+
+        if (res.Status == 401)
+        {
+            reason = DreamPortFailureReason.Expired;
+            message = ExtractMessage(res.Body, "登录已过期，请重新登录");
+            return true;
+        }
+
+        if (res.Status != 200 || IsExplicitFailure(res.Body))
+        {
+            reason = null;
+            message = ExtractMessage(res.Body, $"{errorPrefix}（HTTP {res.Status}）");
+            return true;
+        }
+
+        reason = null;
+        message = string.Empty;
+        return false;
+    }
+
+    private static string? FirstNonBlank(JsonElement el, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var val = GetString(el, name);
+            if (!string.IsNullOrWhiteSpace(val))
+                return val.Trim();
+        }
+
+        return null;
+    }
+
+    private static JsonElement? FirstNonBlankElement(JsonElement el, params string[] names)
+    {
+        if (el.ValueKind != JsonValueKind.Object)
+            return null;
+
+        foreach (var name in names)
+        {
+            if (!el.TryGetProperty(name, out var prop)
+                || prop.ValueKind == JsonValueKind.Null
+                || prop.ValueKind == JsonValueKind.Undefined)
+                continue;
+
+            if (prop.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(prop.GetString()))
+                continue;
+
+            return prop;
+        }
+
+        return null;
+    }
+
+    private static string? ShowAnnouncementTag(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+        var trimmed = raw.Trim();
+        if (trimmed.Equals("published", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("draft", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("archived", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("hidden", StringComparison.OrdinalIgnoreCase))
+            return null;
+        return trimmed;
+    }
+
+    private static string FormatAnnouncementDate(JsonElement? element)
+    {
+        if (element is not { } prop)
+            return string.Empty;
+
+        if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt64(out var numMs))
+        {
+            return FormatUnixMsOrFallback(numMs, prop.ToString());
+        }
+
+        var raw = (prop.ValueKind == JsonValueKind.String ? prop.GetString() : prop.ToString())?.Trim();
+        if (string.IsNullOrEmpty(raw))
+            return string.Empty;
+
+        if (raw.Length >= 10 && raw.All(char.IsDigit) && long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedMs))
+            return FormatUnixMsOrFallback(parsedMs, raw);
+
+        if (DateTimeOffset.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var dt))
+            return dt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        return raw;
+    }
+
+    private static string FormatUnixMsOrFallback(long ms, string fallback)
+    {
+        try
+        {
+            return DateTimeOffset.FromUnixTimeMilliseconds(ms).ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
     private static string GetPlatformTag()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -1126,6 +1632,30 @@ public sealed class DreamPortApiClient : IDisposable
 
         return sb.Length > 0 ? sb.ToString() : "unknown";
     }
+
+    [GeneratedRegex(@"!?\[([^\]]+)\]\(([^)\s]+)\)", RegexOptions.Compiled)]
+    private static partial Regex MdLinkPattern();
+
+    [GeneratedRegex(@"^[ \t]*#{1,6}[ \t]+", RegexOptions.Compiled | RegexOptions.Multiline)]
+    private static partial Regex MdHeadingPattern();
+
+    [GeneratedRegex(@"^[ \t]*>[ \t]?", RegexOptions.Compiled | RegexOptions.Multiline)]
+    private static partial Regex MdBlockquotePattern();
+
+    [GeneratedRegex(@"^([ \t]*)[-*+][ \t]+", RegexOptions.Compiled | RegexOptions.Multiline)]
+    private static partial Regex MdBulletPattern();
+
+    [GeneratedRegex(@"\*\*([^*\r\n]+)\*\*", RegexOptions.Compiled)]
+    private static partial Regex MdStrongUnderlinePattern();
+
+    [GeneratedRegex(@"(?<!\*)\*([^*\r\n]+)\*(?!\*)", RegexOptions.Compiled)]
+    private static partial Regex MdEmphasisPattern();
+
+    [GeneratedRegex(@"`([^`\r\n]+)`", RegexOptions.Compiled)]
+    private static partial Regex MdInlineCodePattern();
+
+    [GeneratedRegex(@"\n{3,}", RegexOptions.Compiled)]
+    private static partial Regex MdMultiBlankLinesPattern();
 
     private sealed record ApiResponse(int Status, JsonDocument? Body, string? RawBody, string? NetError);
 }

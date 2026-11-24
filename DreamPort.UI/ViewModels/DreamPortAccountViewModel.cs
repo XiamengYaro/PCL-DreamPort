@@ -6,17 +6,20 @@ using CommunityToolkit.Mvvm.Input;
 using DreamPort.Core.Api;
 using DreamPort.Core.Auth;
 using DreamPort.Core.Config;
+using DreamPort.Core.Services;
 using DreamPort.UI.Helpers;
+using DreamPort.UI.Services;
 using PCL.Core.App;
 
 namespace DreamPort.UI.ViewModels;
 
 /// <summary>
-/// DreamPort 账号登录（浏览器确认 + 同码二维码）、多设备会话管理、六步入服引导（QQ/MC验证/邀请/AI问卷/申诉）与主页模式视图模型。
+/// DreamPort 账号登录（浏览器确认 + 同码二维码）、多设备会话管理、六步入服引导（QQ/MC验证/邀请/AI问卷/申诉）、每日签到积分称号与主页模式视图模型。
 /// </summary>
 public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 {
     private readonly DreamPortSessionStore _store;
+    private readonly DreamPortAutoSigninService _autoSigninService;
     private readonly Action? _onHomepagePreferenceChanged;
     private readonly Action? _onSessionOrSiteChanged;
     private readonly Action<string> _openUrl;
@@ -27,6 +30,8 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _waitCts;
     private CancellationTokenSource? _msaCts;
     private bool _initialized;
+    private string? _equippedTitleCode;
+    private string? _latestProfileStatus;
 
     [ObservableProperty] private string _baseUrl = DreamPortBuildConfig.BaseUrl;
     [ObservableProperty] private bool _isLoggedIn;
@@ -81,10 +86,22 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private string _sessionsSummaryText = "登录后可查看与管理各设备会话。";
 
+    // ── 每日签到、积分与称号 ──
+    [ObservableProperty] private string _pointsBalanceText = "-";
+    [ObservableProperty] private string _signinStatusText = "尚未查询今日签到状态";
+    [ObservableProperty] private string _signinStreakText = "-";
+    [ObservableProperty] private string _pendingTasksText = "-";
+    [ObservableProperty] private string _equippedTitleText = "未佩戴称号";
+    [ObservableProperty] private bool _isSignedToday;
+    [ObservableProperty] private bool _isSigninBusy;
+    [ObservableProperty] private bool _isTitleBusy;
+    [ObservableProperty] private DreamPortTitleOption? _selectedTitleOption;
+
     public ObservableCollection<DreamPortProgressStepVm> StepItems { get; } = [];
     public ObservableCollection<DreamPortSessionItemVm> SessionItems { get; } = [];
     public ObservableCollection<DreamPortQuestionVm> Questions { get; } = [];
     public ObservableCollection<DreamPortScoreFeedbackVm> ScoreFeedbacks { get; } = [];
+    public ObservableCollection<DreamPortTitleOption> OwnedTitles { get; } = [];
 
     public DreamPortAccountViewModel(
         Action? onHomepagePreferenceChanged = null,
@@ -93,11 +110,13 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         Action<string>? openUrl = null,
         Func<CancellationToken, Task<(string? AccessToken, string? PlayerName, string? Error)>>? acquireMcToken = null,
         Func<string?>? getActiveMcProfileName = null,
-        Action? onSessionOrSiteChanged = null)
+        Action? onSessionOrSiteChanged = null,
+        DreamPortAutoSigninService? autoSigninService = null)
     {
         _onHomepagePreferenceChanged = onHomepagePreferenceChanged;
         _onSessionOrSiteChanged = onSessionOrSiteChanged;
         _store = store ?? new DreamPortSessionStore();
+        _autoSigninService = autoSigninService ?? new DreamPortAutoSigninService(_store.DataDirectory);
         _clientFactory = clientFactory ?? (url => new DreamPortApiClient(url));
         _openUrl = openUrl ?? (url => Basics.OpenPath(url));
         _acquireMcToken = acquireMcToken;
@@ -131,12 +150,29 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
     public bool HasQqUnavailableHint => !string.IsNullOrWhiteSpace(QqUnavailableHint);
     public bool ShowVerificationSections => ShowEntryFlowCard && !IsBanned && !IsApprovedPlayer;
     public bool HasQuestionnaireSummary => !string.IsNullOrWhiteSpace(QuestionnaireSummaryText);
+    public bool HasOwnedTitles => OwnedTitles.Count > 0;
+    public bool ShowRewardsCard => IsLoggedIn && !IsAdminAccount;
+    public bool CanManualSignin => IsLoggedIn && !IsAdminAccount && IsApprovedPlayer && !IsSignedToday && !IsSigninBusy && IsNotBusy;
+    public bool CanApplySelectedTitle => IsLoggedIn && !IsAdminAccount && IsApprovedPlayer && SelectedTitleOption is not null && !IsTitleBusy && IsNotBusy;
+    public bool CanUnequipTitle => IsLoggedIn && !IsAdminAccount && IsApprovedPlayer && !string.IsNullOrEmpty(_equippedTitleCode) && !IsTitleBusy && IsNotBusy;
 
     partial void OnIsLoggedInChanged(bool value)
     {
         OnPropertyChanged(nameof(IsNotLoggedIn));
         OnPropertyChanged(nameof(CanBindQq));
         OnPropertyChanged(nameof(CanUnbindQq));
+        OnPropertyChanged(nameof(ShowRewardsCard));
+        OnPropertyChanged(nameof(CanManualSignin));
+        OnPropertyChanged(nameof(CanApplySelectedTitle));
+        OnPropertyChanged(nameof(CanUnequipTitle));
+    }
+
+    partial void OnIsAdminAccountChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowRewardsCard));
+        OnPropertyChanged(nameof(CanManualSignin));
+        OnPropertyChanged(nameof(CanApplySelectedTitle));
+        OnPropertyChanged(nameof(CanUnequipTitle));
     }
 
     partial void OnIsBusyChanged(bool value)
@@ -145,6 +181,9 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanBindQq));
         OnPropertyChanged(nameof(CanUnbindQq));
         OnPropertyChanged(nameof(CanSubmitAppeal));
+        OnPropertyChanged(nameof(CanManualSignin));
+        OnPropertyChanged(nameof(CanApplySelectedTitle));
+        OnPropertyChanged(nameof(CanUnequipTitle));
     }
 
     partial void OnIsStatusErrorChanged(bool value) => OnPropertyChanged(nameof(IsNotStatusError));
@@ -160,8 +199,22 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
     partial void OnAppealStatusTextChanged(string value) => OnPropertyChanged(nameof(HasAppealStatus));
     partial void OnShowEntryFlowCardChanged(bool value) => OnPropertyChanged(nameof(ShowVerificationSections));
     partial void OnIsBannedChanged(bool value) => OnPropertyChanged(nameof(ShowVerificationSections));
-    partial void OnIsApprovedPlayerChanged(bool value) => OnPropertyChanged(nameof(ShowVerificationSections));
+    partial void OnIsApprovedPlayerChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowVerificationSections));
+        OnPropertyChanged(nameof(CanManualSignin));
+        OnPropertyChanged(nameof(CanApplySelectedTitle));
+        OnPropertyChanged(nameof(CanUnequipTitle));
+    }
     partial void OnQuestionnaireSummaryTextChanged(string value) => OnPropertyChanged(nameof(HasQuestionnaireSummary));
+    partial void OnIsSignedTodayChanged(bool value) => OnPropertyChanged(nameof(CanManualSignin));
+    partial void OnIsSigninBusyChanged(bool value) => OnPropertyChanged(nameof(CanManualSignin));
+    partial void OnIsTitleBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanApplySelectedTitle));
+        OnPropertyChanged(nameof(CanUnequipTitle));
+    }
+    partial void OnSelectedTitleOptionChanged(DreamPortTitleOption? value) => OnPropertyChanged(nameof(CanApplySelectedTitle));
 
     public async Task InitializeAsync()
     {
@@ -204,6 +257,145 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void OpenBanAppealInBrowser() => OpenSitePathInBrowser("/ban-appeal", "封禁申诉");
+
+    [RelayCommand]
+    private void OpenTasksCenter() => OpenSitePathInBrowser("/tasks", "任务与兑换中心");
+
+    [RelayCommand]
+    private async Task RefreshRewardsAndTitlesAsync()
+    {
+        if (!IsLoggedIn || IsAdminAccount)
+            return;
+
+        IsBusy = true;
+        try
+        {
+            await RefreshRewardsAndTitlesCoreAsync(
+                allowAutoSignin: false,
+                profileStatus: _latestProfileStatus,
+                showErrorInStatus: true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ManualSigninAsync()
+    {
+        if (!IsLoggedIn || IsAdminAccount)
+            return;
+        if (!IsApprovedPlayer)
+        {
+            SetStatus("完成入服白名单审核后即可每日签到领取积分。", DreamPortHintLevel.Warning);
+            return;
+        }
+
+        IsSigninBusy = true;
+        try
+        {
+            var res = await _api.SigninAsync();
+            if (!res.Ok)
+            {
+                if (res.FailureReason == DreamPortFailureReason.Expired)
+                {
+                    HandleSessionExpired(res.Message);
+                    return;
+                }
+
+                SetStatus(res.Message, DreamPortHintLevel.Error);
+                return;
+            }
+
+            if (res.First)
+            {
+                var pts = res.PointsAwarded > 0 ? $"（+{res.PointsAwarded} 积分）" : "";
+                SetStatus($"✓ {res.Message}{pts}", DreamPortHintLevel.Info);
+            }
+            else
+            {
+                SetStatus($"✓ {res.Message}", DreamPortHintLevel.Info);
+            }
+
+            await RefreshRewardsAndTitlesCoreAsync(
+                allowAutoSignin: false,
+                profileStatus: _latestProfileStatus,
+                showErrorInStatus: false);
+        }
+        finally
+        {
+            IsSigninBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ApplySelectedTitleAsync()
+    {
+        if (!IsLoggedIn || IsAdminAccount || SelectedTitleOption is null)
+            return;
+
+        IsTitleBusy = true;
+        try
+        {
+            var res = await _api.EquipTitleAsync(SelectedTitleOption.Code);
+            if (!res.Ok)
+            {
+                if (res.FailureReason == DreamPortFailureReason.Expired)
+                {
+                    HandleSessionExpired(res.Message);
+                    return;
+                }
+
+                SetStatus(res.Message, DreamPortHintLevel.Error);
+                return;
+            }
+
+            SetStatus($"✓ 已佩戴称号：{SelectedTitleOption.Name}", DreamPortHintLevel.Info);
+            await RefreshRewardsAndTitlesCoreAsync(
+                allowAutoSignin: false,
+                profileStatus: _latestProfileStatus,
+                showErrorInStatus: false);
+        }
+        finally
+        {
+            IsTitleBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task UnequipTitleAsync()
+    {
+        if (!IsLoggedIn || IsAdminAccount)
+            return;
+
+        IsTitleBusy = true;
+        try
+        {
+            var res = await _api.UnequipTitleAsync();
+            if (!res.Ok)
+            {
+                if (res.FailureReason == DreamPortFailureReason.Expired)
+                {
+                    HandleSessionExpired(res.Message);
+                    return;
+                }
+
+                SetStatus(res.Message, DreamPortHintLevel.Error);
+                return;
+            }
+
+            SetStatus($"✓ {res.Message}", DreamPortHintLevel.Info);
+            await RefreshRewardsAndTitlesCoreAsync(
+                allowAutoSignin: false,
+                profileStatus: _latestProfileStatus,
+                showErrorInStatus: false);
+        }
+        finally
+        {
+            IsTitleBusy = false;
+        }
+    }
 
     [RelayCommand]
     private async Task StartBrowserLoginAsync()
@@ -951,6 +1143,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         RefreshActiveMcProfileHint();
 
         var profile = await _api.GetProfileAsync(ct);
+        _latestProfileStatus = profile?.Status;
         UpdateMetaSummary(isAdmin, isTokenPersistent, profile);
 
         if (isAdmin)
@@ -961,6 +1154,8 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             SessionsSummaryText = "管理员会话由独立后台安全域托管，不在此列表管理。";
             SessionItems.Clear();
             OnPropertyChanged(nameof(HasSessions));
+            ResetRewardsAndTitlesState();
+            DreamPortShellBridge.ResetUnreadCount();
             if (showSuccessBanner)
                 SetStatus("✓ 已连接 DreamPort 站点（管理员身份）。", DreamPortHintLevel.Info);
             return;
@@ -985,6 +1180,11 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         }
 
         await LoadSessionsCoreAsync(ct);
+        var autoSignedNow = await RefreshRewardsAndTitlesCoreAsync(
+            allowAutoSignin: IsApprovedPlayer && string.Equals(profile?.Status, "approved", StringComparison.OrdinalIgnoreCase),
+            profileStatus: profile?.Status,
+            showErrorInStatus: false,
+            ct);
 
         if (showSuccessBanner)
         {
@@ -994,6 +1194,8 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                 SetStatus("入服审核未通过，可在下方提交人工复核申诉或查看管理员回复。", DreamPortHintLevel.Warning);
             else if (ShowEntryFlowCard)
                 SetStatus("已登录 DreamPort 站点，请按下方入服引导完成待办步骤。", DreamPortHintLevel.Warning);
+            else if (autoSignedNow)
+                SetStatus("✓ 已连接 DreamPort 站点并完成每日自动签到。", DreamPortHintLevel.Info);
             else
                 SetStatus("✓ 已连接 DreamPort 站点并完成账号与会话校验。", DreamPortHintLevel.Info);
         }
@@ -1532,6 +1734,132 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(HasSessions));
         SessionsSummaryText = "登录后可查看与管理各设备会话。";
         StepItems.Clear();
+        _latestProfileStatus = null;
+        ResetRewardsAndTitlesState();
+        DreamPortShellBridge.ResetUnreadCount();
+    }
+
+    private void ResetRewardsAndTitlesState()
+    {
+        PointsBalanceText = "-";
+        SigninStatusText = "尚未查询今日签到状态";
+        SigninStreakText = "-";
+        PendingTasksText = "-";
+        _equippedTitleCode = null;
+        EquippedTitleText = "未佩戴称号";
+        IsSignedToday = false;
+        OwnedTitles.Clear();
+        SelectedTitleOption = null;
+        OnPropertyChanged(nameof(HasOwnedTitles));
+        OnPropertyChanged(nameof(CanUnequipTitle));
+    }
+
+    private async Task<bool> RefreshRewardsAndTitlesCoreAsync(
+        bool allowAutoSignin,
+        string? profileStatus,
+        bool showErrorInStatus,
+        CancellationToken ct = default)
+    {
+        var centerTask = _api.GetPointsCenterAsync(ct);
+        var titlesTask = _api.GetMyTitlesAsync(ct);
+        var unreadTask = _api.GetUnreadNotificationCountAsync(ct);
+        await Task.WhenAll(centerTask, titlesTask, unreadTask);
+
+        var center = await centerTask;
+        var titles = await titlesTask;
+        var unread = await unreadTask;
+
+        if (unread.Ok)
+            DreamPortShellBridge.PublishUnreadCount(unread.Unread);
+
+        if (center.FailureReason == DreamPortFailureReason.Expired
+            || titles.FailureReason == DreamPortFailureReason.Expired
+            || unread.FailureReason == DreamPortFailureReason.Expired)
+        {
+            if (showErrorInStatus)
+                HandleSessionExpired(center.Message ?? titles.Message ?? "登录已过期，请重新登录。");
+            return false;
+        }
+
+        if (center.Ok)
+            ApplyPointsCenter(center);
+        else if (showErrorInStatus)
+            SetStatus(center.Message ?? "获取积分与签到信息失败。", DreamPortHintLevel.Warning);
+
+        if (titles.Ok)
+            ApplyTitlesMine(titles);
+        else if (showErrorInStatus && center.Ok)
+            SetStatus(titles.Message ?? "获取称号列表失败。", DreamPortHintLevel.Warning);
+
+        var signedNow = false;
+        if (allowAutoSignin && center.Ok && !center.SignedToday && IsApprovedPlayer)
+        {
+            var outcome = await _autoSigninService.TryAutoSigninAsync(_api, LoggedInUsername, profileStatus, ct);
+            if (outcome.SignedNow)
+            {
+                signedNow = true;
+                var refreshedCenter = await _api.GetPointsCenterAsync(ct);
+                if (refreshedCenter.Ok)
+                    ApplyPointsCenter(refreshedCenter);
+            }
+        }
+
+        if (showErrorInStatus && center.Ok && titles.Ok)
+            SetStatus("✓ 已刷新积分、每日签到与称号状态。", DreamPortHintLevel.Info);
+
+        return signedNow;
+    }
+
+    private void ApplyPointsCenter(DreamPortPointsCenterResult center)
+    {
+        PointsBalanceText = $"{center.Balance} 积分";
+        IsSignedToday = center.SignedToday;
+        SigninStatusText = center.SignedToday
+            ? "今日已签到"
+            : IsApprovedPlayer
+                ? "今日尚未签到"
+                : "通过入服审核后可每日签到";
+        SigninStreakText = $"连续 {center.Streak} 天 · 本月累计 {center.MonthDays} 天";
+        PendingTasksText = center.PendingClaimCount > 0
+            ? $"{center.PendingClaimCount} 项任务奖励可领取"
+            : "暂无待领取奖励";
+    }
+
+    private void ApplyTitlesMine(DreamPortTitlesMineResult titles)
+    {
+        var previousCode = SelectedTitleOption?.Code;
+        _equippedTitleCode = titles.EquippedCode;
+
+        OwnedTitles.Clear();
+        DreamPortTitleOption? equippedMatch = null;
+        DreamPortTitleOption? previousMatch = null;
+
+        foreach (var item in titles.Owned)
+        {
+            var isEquipped = !string.IsNullOrEmpty(_equippedTitleCode)
+                && string.Equals(item.Code, _equippedTitleCode, StringComparison.Ordinal);
+            var opt = new DreamPortTitleOption(item.Code, item.Name, item.Desc, item.Color, isEquipped);
+            OwnedTitles.Add(opt);
+            if (isEquipped)
+                equippedMatch = opt;
+            if (!string.IsNullOrEmpty(previousCode) && string.Equals(item.Code, previousCode, StringComparison.Ordinal))
+                previousMatch = opt;
+        }
+
+        SelectedTitleOption = equippedMatch ?? previousMatch ?? OwnedTitles.FirstOrDefault();
+
+        var equippedLabel = equippedMatch is not null
+            ? equippedMatch.Name
+            : string.IsNullOrEmpty(_equippedTitleCode)
+                ? "未佩戴称号"
+                : _equippedTitleCode;
+        var achievementSuffix = titles.TotalAchievements > 0
+            ? $"（成就 {titles.CompletedAchievements}/{titles.TotalAchievements} · 未解锁 {titles.LockedCount} 个）"
+            : "";
+        EquippedTitleText = $"{equippedLabel}{achievementSuffix}";
+
+        OnPropertyChanged(nameof(HasOwnedTitles));
+        OnPropertyChanged(nameof(CanUnequipTitle));
     }
 
     /// <summary>

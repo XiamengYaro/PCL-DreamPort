@@ -5,7 +5,7 @@
 > [PCL Community Edition (PCL CE)](https://github.com/PCL-Community/PCL-CE)
 > 独立进行二次创作的衍生修改版，与龙腾猫跃及 PCL 官方无关联。请勿向 PCL / PCL CE 上游反馈本分支的问题。
 
-## 当前阶段（Phase 2）已实现能力
+## 当前阶段（Phase 3）已实现能力
 
 - **跨平台底座**：基于 .NET 10 / C# 15 / Avalonia 12，支持 macOS（ARM64 / x64）、Windows 与 Linux
 - **合规底座与隔离**：
@@ -17,7 +17,9 @@
 - **下载与更新源分工**：游戏数据下载沿用 PCL 原生官方源 / BMCLAPI 并隔离下载层 User-Agent（`PCL-DreamPort/{version}`）；梦港加速源（`https://dl.xmcraft.cn`，`DP_UPDATE_MIRROR_URL`）仅用于启动器更新等配套服务
 - **完整梦港账号系统与多设备管理**：「工具 → 梦港账号」支持配置站点地址（切换站点自动向旧站点 `/api/logout` 注销并清理旧凭据与主页缓存）、浏览器确认 + 同码扫码授权登录（`/api/qr-login/*`）、网页注册/安全与通行密钥/封禁申诉快捷直达、系统加密存储（DPAPI / Keychain）、严格区分会话过期（401）与网络波动，以及活跃设备查看与单设备/批量踢出（`/api/auth/sessions*`）
 - **六步入服引导流程（原生 PCL 控件）**：对接 `/api/user/progress` 实时展示六步进度，内置 QQ 绑定/解绑（`/api/user/qq/*`）、使用当前启动器已登录微软正版档案一键验证正版 ID（`POST /api/user/minecraft/verify-token`）及微软设备码备用验证、邀请码入服（`POST /api/invite/apply`）、可交互入服问卷与 SSE 实时逐题 AI 评分反馈（`/api/questionnaire/{config,stream,submit}`），以及被拒绝/封禁状态引导与问卷人工复核申诉（`/api/questionnaire/appeal*`）
-- **PCL 原生自定义主页推送**：启动器首页默认接入站点 `GET /api/client/pcl-homepage` 与 `/version`（支持版本比对与服务端自动从网页端主页编排翻译或自定义 XAML 下发），不可达或离线时静默回退至本地 XAML 原型
+- **每日自动签到、积分与称号管理**：启动器启动与账号校验时自动为已过审玩家执行每日一次静默签到并按自然日去重（`POST /api/points/signin`）；「梦港账号」页展示积分余额、签到天数、待领任务数并支持手动签到、跳转任务中心及查看/佩戴/卸下已拥有称号（`/api/points/center`、`/api/titles/*`）
+- **服务器公告与站内通知中心**：新增「工具 → 公告与通知」页及标题栏右上角通知图标与实时未读数字角标，支持免登录浏览官网服务器公告资讯（`GET /api/announcements`），以及登录后按未读筛选通知、单条/全部已读与安全链接跳转（`/api/notifications*`）
+- **PCL 原生自定义主页推送**：启动器首页默认接入站点 `GET /api/client/pcl-homepage` 与 `/version`（支持版本比对与服务端自动从网页端主页编排翻译或自定义 XAML 下发），并对版本接口与缓存内容校验防污染，不可达或离线时静默回退至本地 XAML 原型
 
 ## 运行环境要求
 

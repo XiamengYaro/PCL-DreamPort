@@ -3701,4 +3701,6 @@
     <sys:String x:Key="Setup.Ui.Background.PauseVideo.ToolTip">If enabled, the background cannot be refreshed whilst the game is running</sys:String>
     <sys:String x:Key="Tools.Left.DreamPort">DreamPort</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortAccount">DreamPort Account</sys:String>
+    <sys:String x:Key="Tools.Left.DreamPortCommunity">News &amp; Notifications</sys:String>
+    <sys:String x:Key="Main.Menu.Notifications">Notifications &amp; Announcements</sys:String>
 </ResourceDictionary>

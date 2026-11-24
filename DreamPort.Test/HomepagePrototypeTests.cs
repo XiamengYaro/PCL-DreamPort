@@ -65,4 +65,42 @@ public sealed class HomepagePrototypeTests
         var result = XamlSecurityValidator.ValidateFragment(sampleBackendXaml);
         Assert.IsTrue(result.IsValid, string.Join("; ", result.Errors));
     }
+
+    [TestMethod]
+    public void ProductionV1450PclHomepageSnapshot_PassesSecurityValidatorAndHasNoEmoji()
+    {
+        const string liveSnapshot = """
+            <StackPanel xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                        xmlns:local="clr-namespace:PCL;assembly=Plain Craft Launcher 2">
+                <local:MyCard Title="XMCraft 测试文案" Margin="0,0,0,15">
+                    <StackPanel Margin="25,40,23,15">
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,10" Text="XMCraft 测试文案" />
+                        <StackPanel Orientation="Horizontal">
+                            <local:MyButton Padding="13,6" Margin="0,0,10,0" Text="查看服务器与地图" EventType="打开网页" EventData="https://xmcraft.cn/servers" />
+                            <local:MyButton Padding="13,6" Margin="0,0,10,0" ColorType="Highlight" Text="同步配套模组" EventType="打开网页" EventData="https://xmcraft.cn" />
+                            <local:MyButton Padding="13,6" Margin="0,0,10,0" Text="刷新主页" EventType="刷新主页" />
+                        </StackPanel>
+                    </StackPanel>
+                </local:MyCard>
+                <local:MyCard Title="照片墙" Margin="0,0,0,15" CanSwap="True">
+                    <StackPanel Margin="25,40,23,15">
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,10" Text="欢迎在社区照片墙浏览玩家实景摄影与建筑打卡作品。" />
+                        <StackPanel Orientation="Horizontal">
+                            <local:MyButton Padding="13,6" Margin="0,0,10,0" Text="浏览照片墙" EventType="打开网页" EventData="https://xmcraft.cn/community" />
+                        </StackPanel>
+                    </StackPanel>
+                </local:MyCard>
+                <local:MyCard Title="最近实例" Margin="0,0,0,15" CanSwap="True">
+                    <StackPanel Margin="25,40,23,15">
+                    </StackPanel>
+                </local:MyCard>
+            </StackPanel>
+            """;
+
+        Assert.IsTrue(HomepageXamlFormatDetector.IsXaml(liveSnapshot));
+        var result = XamlSecurityValidator.ValidateFragment(liveSnapshot);
+        Assert.IsTrue(result.IsValid, string.Join("; ", result.Errors));
+        Assert.IsFalse(LicenseComplianceTests.ContainsColorEmoji(liveSnapshot, out var offense), $"不应含彩色 emoji：{offense}");
+    }
 }

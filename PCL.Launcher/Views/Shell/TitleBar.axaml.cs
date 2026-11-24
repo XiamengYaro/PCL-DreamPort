@@ -1,3 +1,4 @@
+using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -88,9 +89,31 @@ public partial class TitleBar : UserControl
 
     public event Action? HelpRequested;
 
+    public event Action? NotificationsRequested;
+
     public event Action? MinimizeRequested;
 
     public event Action? CloseRequested;
+
+    public void UpdateNotificationUnreadCount(int unread)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => UpdateNotificationUnreadCount(unread));
+            return;
+        }
+
+        if (unread > 0)
+        {
+            LabTitleNotifyBadge.Text = unread > 99 ? "99+" : unread.ToString(CultureInfo.InvariantCulture);
+            BadgeTitleNotify.IsVisible = true;
+        }
+        else
+        {
+            LabTitleNotifyBadge.Text = string.Empty;
+            BadgeTitleNotify.IsVisible = false;
+        }
+    }
 
     public void RefreshTitleAppearance()
     {
@@ -369,6 +392,11 @@ public partial class TitleBar : UserControl
     private void Help_OnClick(object? sender, EventArgs e)
     {
         HelpRequested?.Invoke();
+    }
+
+    private void Notify_OnClick(object? sender, EventArgs e)
+    {
+        NotificationsRequested?.Invoke();
     }
 
     private void Minimize_OnClick(object? sender, EventArgs e)

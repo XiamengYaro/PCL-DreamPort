@@ -3701,4 +3701,6 @@
     <sys:String x:Key="Setup.Ui.Background.PauseVideo.ToolTip">若啟用此項設定，遊戲時將無法重新整理背景</sys:String>
     <sys:String x:Key="Tools.Left.DreamPort">夢港</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortAccount">夢港帳號</sys:String>
+    <sys:String x:Key="Tools.Left.DreamPortCommunity">公告與通知</sys:String>
+    <sys:String x:Key="Main.Menu.Notifications">站內通知與公告</sys:String>
 </ResourceDictionary>

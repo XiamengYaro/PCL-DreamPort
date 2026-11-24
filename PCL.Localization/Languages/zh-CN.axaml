@@ -3710,4 +3710,6 @@
     <sys:String x:Key="Setup.Ui.Background.PauseVideo.ToolTip">若启用此项设置，游戏时将无法刷新背景</sys:String>
     <sys:String x:Key="Tools.Left.DreamPort">梦港</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortAccount">梦港账号</sys:String>
+    <sys:String x:Key="Tools.Left.DreamPortCommunity">公告与通知</sys:String>
+    <sys:String x:Key="Main.Menu.Notifications">站内通知与公告</sys:String>
 </ResourceDictionary>

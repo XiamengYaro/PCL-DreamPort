@@ -2,13 +2,19 @@ using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Threading;
+using DreamPort.Core.Api;
+using DreamPort.Core.Auth;
 using DreamPort.Core.Config;
+using DreamPort.Core.Services;
+using DreamPort.UI.Services;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
 using PCL.Core.Logging;
 using PCL.Core.Platform;
 using PCL.Core.UI.Dialogs;
+using PCL.Core.UI.Hints;
 using PCL.Core.Utils.OS;
 using PCL.UI;
 using PCL.UI.Controls;
@@ -51,6 +57,7 @@ public sealed class StartupEffects(
         }
 
         Basics.RunInNewThread(ShowStartupDialogs, "StartupDialogs");
+        _ = RunDreamPortStartupTasksAsync();
     }
 
     private void ApplyWindowOpacity()
@@ -316,6 +323,50 @@ public sealed class StartupEffects(
         catch (Exception ex)
         {
             LogWrapper.Warn("UI", $"打开网页失败：{ex.Message}");
+        }
+    }
+
+    private static async Task RunDreamPortStartupTasksAsync()
+    {
+        try
+        {
+            var session = new DreamPortSessionStore().Load();
+            if (string.IsNullOrWhiteSpace(session.Token))
+            {
+                DreamPortShellBridge.ResetUnreadCount();
+                return;
+            }
+
+            using var api = new DreamPortApiClient(session.BaseUrl);
+            api.SetToken(session.Token);
+
+            var unreadTask = api.GetUnreadNotificationCountAsync();
+            var profileTask = api.GetProfileAsync();
+            await Task.WhenAll(unreadTask, profileTask).ConfigureAwait(false);
+
+            var unread = await unreadTask.ConfigureAwait(false);
+            if (unread.Ok)
+                DreamPortShellBridge.PublishUnreadCount(unread.Unread);
+
+            var profile = await profileTask.ConfigureAwait(false);
+            if (profile is not null
+                && string.Equals(profile.Status, "approved", StringComparison.OrdinalIgnoreCase))
+            {
+                var signinService = new DreamPortAutoSigninService();
+                var username = !string.IsNullOrWhiteSpace(profile.Username)
+                    ? profile.Username
+                    : session.Username;
+                var outcome = await signinService.TryAutoSigninAsync(api, username, profile.Status).ConfigureAwait(false);
+                if (outcome.ShouldNotifyUser && !string.IsNullOrWhiteSpace(outcome.NotificationText))
+                {
+                    Dispatcher.UIThread.Post(() =>
+                        HintService.Show(Hints.Success(outcome.NotificationText!)));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogWrapper.Debug(ex, "DreamPort", "启动后台未读通知与自动签到任务跳过");
         }
     }
 }

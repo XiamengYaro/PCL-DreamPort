@@ -35,7 +35,15 @@ public sealed class ToolsPageModule : IPageModule
             "lucide/user",
             "dreamport",
             2,
-            (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortAccount>(sp))
+            (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortAccount>(sp)),
+        Sub(
+            PageIds.Tools,
+            SubPageIds.ToolsDreamPortCommunity,
+            "Tools.Left.DreamPortCommunity",
+            "lucide/message-circle",
+            "dreamport",
+            3,
+            (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortCommunity>(sp))
     ];
 
     public IReadOnlyList<PageDescriptor> Pages { get; } =
