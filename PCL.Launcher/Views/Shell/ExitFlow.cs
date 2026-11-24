@@ -45,6 +45,15 @@ public sealed class ExitFlow
 
             IsExiting = true;
 
+            try
+            {
+                await DreamPort.UI.Services.DreamPortLobbyLifecycle.ShutdownActiveLobbyOnExitAsync(TimeSpan.FromSeconds(2.5));
+            }
+            catch (Exception ex)
+            {
+                LogWrapper.Debug(ex, "DreamPort", "退出时清理联机房间失败");
+            }
+
             if (UpdateManager.isUpdateWaitingRestart)
                 try
                 {

@@ -1,6 +1,7 @@
 <ui:MyPageRight xmlns="https://github.com/avaloniaui"
                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                 xmlns:vm="using:PCL"
+                xmlns:dpvm="using:DreamPort.UI.ViewModels"
                 xmlns:ui="using:PCL.UI.Controls"
                 x:DataType="vm:PageToolsGameLinkViewModel"
                 x:CompileBindings="True"
@@ -9,47 +10,563 @@
                        HorizontalScrollBarVisibility="Disabled"
                        VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="25,10">
-            <ui:MyHint Margin="0,15,0,0"
+            <ui:MyHint x:Name="HintStatus"
+                       Margin="0,15,0,0"
                        Theme="Blue"
                        Text="{Binding StatusHint}" />
 
+            <!-- 1. 梦港联机服务与账号概览 -->
             <ui:MyCard Margin="0,15"
-                       Title="梦港联机（TCP/TLS 中继）">
+                       Title="梦港联机（TCP/TLS 安全中继）">
                 <StackPanel Margin="25,40,25,20"
-                            Spacing="12">
-                    <TextBlock LineHeight="20"
-                               TextWrapping="Wrap"
-                               Text="{Binding AccountSummary}" />
-                    <TextBlock LineHeight="20"
-                               TextWrapping="Wrap"
+                            Spacing="10">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="{Binding AccountSummary, StringFormat='梦港账号：{0}'}" />
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               FontSize="12"
                                Text="{Binding RelaySummary}" />
-                    <StackPanel Margin="0,4,0,0"
-                                Orientation="Horizontal"
-                                Spacing="12">
-                        <ui:MyButton MinWidth="130"
-                                     Height="35"
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10">
+                        <ui:MyButton MinWidth="120"
+                                     Height="34"
                                      ColorType="Highlight"
                                      Command="{Binding RefreshStatusCommand}"
                                      IsEnabled="{Binding IsNotBusy}"
-                                     Text="刷新联机状态" />
-                        <ui:MyButton x:Name="BtnGoDreamPortAccount"
-                                     MinWidth="130"
-                                     Height="35"
-                                     Text="前往梦港账号" />
+                                     Text="刷新大厅状态" />
+                        <ui:MyButton MinWidth="120"
+                                     Height="34"
+                                     Command="{Binding GoToDreamPortAccountCommand}"
+                                     Text="管理梦港账号" />
                     </StackPanel>
                 </StackPanel>
             </ui:MyCard>
 
+            <!-- 2. 上次异常退出的残留房间自救卡片 -->
             <ui:MyCard Margin="0,0,0,15"
-                       Title="联机架构说明">
+                       IsVisible="{Binding HasStaleRoom}"
+                       Title="检测到未关闭的残留房间">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="10">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="{Binding StaleRoomSummary}" />
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10">
+                        <ui:MyButton MinWidth="135"
+                                     Height="34"
+                                     ColorType="Highlight"
+                                     Command="{Binding CloseStaleRoomCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="关闭残留旧房" />
+                    </StackPanel>
+                </StackPanel>
+            </ui:MyCard>
+
+            <!-- 3A. 房主：正在开房控制台 -->
+            <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding IsHosting}"
+                       Title="房主房间控制台">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="12">
+                        <StackPanel Grid.Column="0"
+                                    Spacing="4">
+                            <TextBlock FontWeight="SemiBold"
+                                       FontSize="16"
+                                       Text="{Binding ActiveRoomName}" />
+                            <TextBlock Text="{Binding ActiveRoomCode, StringFormat='房间码：{0}'}" />
+                            <TextBlock FontSize="12"
+                                       Foreground="{DynamicResource ColorBrushGray4}"
+                                       Text="{Binding HostOccupancyText}" />
+                            <TextBlock FontSize="12"
+                                       Foreground="{DynamicResource ColorBrushGray4}"
+                                       Text="{Binding HostGamePortStatusText}" />
+                            <TextBlock FontSize="12"
+                                       Foreground="{DynamicResource ColorBrushGray4}"
+                                       Text="{Binding TrafficSummaryText}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    VerticalAlignment="Top">
+                            <ui:MyButton MinWidth="100"
+                                         Height="34"
+                                         ColorType="Highlight"
+                                         Command="{Binding CopyRoomCodeCommand}"
+                                         Text="复制房码" />
+                            <ui:MyButton MinWidth="100"
+                                         Height="34"
+                                         Command="{Binding RefreshMembersCommand}"
+                                         IsEnabled="{Binding IsNotBusy}"
+                                         Text="刷新成员" />
+                            <ui:MyButton MinWidth="100"
+                                         Height="34"
+                                         ColorType="Red"
+                                         Command="{Binding StopHostingCommand}"
+                                         IsEnabled="{Binding IsNotBusy}"
+                                         Text="结束开房" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 在线成员列表 -->
+                    <StackPanel Spacing="6">
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="当前房间成员" />
+                        <TextBlock IsVisible="{Binding !HasMembers}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource ColorBrushGray4}"
+                                   Text="正在等待好友或大厅访客加入（成员同步后可在此踢出/解除拉黑）。" />
+                        <ItemsControl IsVisible="{Binding HasMembers}"
+                                      ItemsSource="{Binding Members}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="dpvm:DreamPortLobbyMemberItemVm">
+                                    <Border Margin="0,6,0,0"
+                                            BorderBrush="{DynamicResource ColorBrushGray4}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="12">
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              ColumnSpacing="10">
+                                            <StackPanel Grid.Column="0"
+                                                        Spacing="2">
+                                                <TextBlock FontWeight="SemiBold"
+                                                           Text="{Binding HeaderText}" />
+                                                <TextBlock FontSize="12"
+                                                           Foreground="{DynamicResource ColorBrushGray4}"
+                                                           Text="{Binding MetaText}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1"
+                                                        Orientation="Horizontal"
+                                                        Spacing="8"
+                                                        VerticalAlignment="Center">
+                                                <ui:MyButton MinWidth="84"
+                                                             Height="30"
+                                                             ColorType="Red"
+                                                             IsVisible="{Binding CanKick}"
+                                                             Command="{Binding KickCommand}"
+                                                             Text="踢出并拉黑" />
+                                                <ui:MyButton MinWidth="84"
+                                                             Height="30"
+                                                             IsVisible="{Binding CanUnkick}"
+                                                             Command="{Binding UnkickCommand}"
+                                                             Text="解除拉黑" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- 邀请站内好友 -->
+                    <Border BorderBrush="{DynamicResource ColorBrushGray4}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="10">
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           FontWeight="SemiBold"
+                                           Text="邀请梦港好友加入" />
+                                <ui:MyButton Grid.Column="1"
+                                             MinWidth="90"
+                                             Height="30"
+                                             Command="{Binding RefreshFriendsCommand}"
+                                             IsEnabled="{Binding IsNotBusy}"
+                                             Text="刷新好友" />
+                            </Grid>
+
+                            <Grid IsVisible="{Binding HasFriendOptions}"
+                                  ColumnDefinitions="Auto,*"
+                                  ColumnSpacing="10">
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           Text="从好友选择" />
+                                <ui:MyComboBox Grid.Column="1"
+                                               HorizontalAlignment="Stretch"
+                                               ItemsSource="{Binding FriendOptions}"
+                                               SelectedItem="{Binding SelectedFriend, Mode=TwoWay}">
+                                    <ui:MyComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <TextBlock Text="{Binding}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </DataTemplate>
+                                    </ui:MyComboBox.ItemTemplate>
+                                </ui:MyComboBox>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto,Auto"
+                                  ColumnSpacing="10">
+                                <ui:MyTextBox Grid.Column="0"
+                                              HintText="输入好友梦港用户名"
+                                              Text="{Binding InviteFriendUsernameInput, Mode=TwoWay}" />
+                                <ui:MyTextBox Grid.Column="1"
+                                              MinWidth="150"
+                                              HintText="附言（可选）"
+                                              Text="{Binding InviteMessageInput, Mode=TwoWay}" />
+                                <ui:MyButton Grid.Column="2"
+                                             MinWidth="96"
+                                             Height="34"
+                                             ColorType="Highlight"
+                                             Command="{Binding SendFriendInviteCommand}"
+                                             IsEnabled="{Binding IsNotBusy}"
+                                             Text="发送邀请" />
+                            </Grid>
+
+                            <StackPanel IsVisible="{Binding HasOutgoingInvites}"
+                                        Spacing="6">
+                                <TextBlock FontSize="12"
+                                           Foreground="{DynamicResource ColorBrushGray4}"
+                                           Text="待对方处理的邀请" />
+                                <ItemsControl ItemsSource="{Binding OutgoingInvites}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="dpvm:DreamPortLobbyInviteItemVm">
+                                            <Border Margin="0,4,0,0"
+                                                    BorderBrush="{DynamicResource ColorBrushGray4}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
+                                                    Padding="10">
+                                                <Grid ColumnDefinitions="*,Auto"
+                                                      ColumnSpacing="8">
+                                                    <StackPanel Grid.Column="0"
+                                                                Spacing="2">
+                                                        <TextBlock FontWeight="SemiBold"
+                                                                   Text="{Binding HeaderText}" />
+                                                        <TextBlock FontSize="12"
+                                                                   Foreground="{DynamicResource ColorBrushGray4}"
+                                                                   Text="{Binding DetailText}" />
+                                                    </StackPanel>
+                                                    <ui:MyButton Grid.Column="1"
+                                                                 MinWidth="80"
+                                                                 Height="30"
+                                                                 Command="{Binding CancelCommand}"
+                                                                 Text="撤回" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ui:MyCard>
+
+            <!-- 3B. 访客：已加入房间状态卡片 -->
+            <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding IsGuest}"
+                       Title="已加入联机房间">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="12">
+                    <ui:MyHint IsVisible="{Binding IsHostGone}"
+                               Theme="Yellow"
+                               Text="{Binding HostGoneBannerText}" />
+
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="12">
+                        <StackPanel Grid.Column="0"
+                                    Spacing="4">
+                            <TextBlock FontWeight="SemiBold"
+                                       FontSize="16"
+                                       Text="{Binding ActiveRoomName}" />
+                            <TextBlock Text="{Binding ActiveRoomCode, StringFormat='房间码：{0}'}" />
+                            <TextBlock FontWeight="SemiBold"
+                                       Text="{Binding GuestLocalAddress, StringFormat='本地直连地址：{0}'}" />
+                            <TextBlock FontSize="12"
+                                       Foreground="{DynamicResource ColorBrushGray4}"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding GuestAdvertiseHint}" />
+                            <TextBlock FontSize="12"
+                                       Foreground="{DynamicResource ColorBrushGray4}"
+                                       Text="{Binding TrafficSummaryText}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    VerticalAlignment="Top">
+                            <ui:MyButton MinWidth="110"
+                                         Height="34"
+                                         ColorType="Highlight"
+                                         Command="{Binding CopyLocalAddressCommand}"
+                                         Text="复制直连地址" />
+                            <ui:MyButton MinWidth="100"
+                                         Height="34"
+                                         ColorType="Red"
+                                         Command="{Binding LeaveRoomCommand}"
+                                         IsEnabled="{Binding IsNotBusy}"
+                                         Text="离开房间" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </ui:MyCard>
+
+            <!-- 4. 创建我的联机房间（仅空闲态可见） -->
+            <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding IsIdle}"
+                       Title="创建我的联机房间">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="10">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="先在 Minecraft 单人存档中开启「对局域网开放」，再点击自动检测或手动填写端口号即可一键开启梦港 TCP/TLS 安全中继。" />
+
+                    <Grid ColumnDefinitions="Auto,*,Auto,140"
+                          ColumnSpacing="12">
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Text="房间名称" />
+                        <ui:MyTextBox Grid.Column="1"
+                                      HintText="留空自动生成（最多 24 字）"
+                                      IsEnabled="{Binding IsNotBusy}"
+                                      Text="{Binding RoomNameInput, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Text="可见性" />
+                        <ui:MyComboBox Grid.Column="3"
+                                       SelectedIndex="{Binding VisibilityIndex, Mode=TwoWay}">
+                            <ui:MyComboBoxItem Content="公开房间" />
+                            <ui:MyComboBoxItem Content="仅受邀/房码" />
+                        </ui:MyComboBox>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                          ColumnSpacing="12">
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Text="游戏端口" />
+                        <ui:MyTextBox Grid.Column="1"
+                                      HintText="例如 25565（或点击右侧自动检测）"
+                                      IsEnabled="{Binding IsNotBusy}"
+                                      Text="{Binding LocalPortInput, Mode=TwoWay}" />
+                        <ui:MyButton Grid.Column="2"
+                                     MinWidth="130"
+                                     Height="34"
+                                     IsVisible="{Binding !IsDetectingPort}"
+                                     Command="{Binding DetectLanPortCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="自动检测游戏端口" />
+                        <ui:MyButton Grid.Column="2"
+                                     MinWidth="130"
+                                     Height="34"
+                                     IsVisible="{Binding IsDetectingPort}"
+                                     Command="{Binding CancelDetectLanPortCommand}"
+                                     Text="取消端口检测" />
+                        <ui:MyButton Grid.Column="3"
+                                     MinWidth="110"
+                                     Height="34"
+                                     ColorType="Highlight"
+                                     Command="{Binding CreateAndHostRoomCommand}"
+                                     IsEnabled="{Binding CanHostOrJoin}"
+                                     Text="开始开房" />
+                    </Grid>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto,*"
+                          ColumnSpacing="12">
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Text="MC 版本" />
+                        <ui:MyTextBox Grid.Column="1"
+                                      HintText="可选，如 1.21.4"
+                                      IsEnabled="{Binding IsNotBusy}"
+                                      Text="{Binding McVersionInput, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Text="模组加载器" />
+                        <ui:MyTextBox Grid.Column="3"
+                                      HintText="可选，如 Fabric / NeoForge"
+                                      IsEnabled="{Binding IsNotBusy}"
+                                      Text="{Binding ModLoaderInput, Mode=TwoWay}" />
+                    </Grid>
+                </StackPanel>
+            </ui:MyCard>
+
+            <!-- 5. 通过房间码加入好友房间（仅空闲态可见） -->
+            <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding IsIdle}"
+                       Title="加入好友房间">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="10">
+                    <Grid ColumnDefinitions="Auto,*,Auto,140,Auto"
+                          ColumnSpacing="12">
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   Text="房间码" />
+                        <ui:MyTextBox Grid.Column="1"
+                                      HintText="输入 8 位房间码（不区分大小写）"
+                                      IsEnabled="{Binding IsNotBusy}"
+                                      Text="{Binding JoinRoomCodeInput, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2"
+                                   VerticalAlignment="Center"
+                                   Text="本地端口" />
+                        <ui:MyTextBox Grid.Column="3"
+                                      HintText="留空自动分配"
+                                      IsEnabled="{Binding IsNotBusy}"
+                                      Text="{Binding PreferLocalPortInput, Mode=TwoWay}" />
+                        <ui:MyButton Grid.Column="4"
+                                     MinWidth="110"
+                                     Height="34"
+                                     ColorType="Highlight"
+                                     Command="{Binding JoinByCodeCommand}"
+                                     IsEnabled="{Binding CanHostOrJoin}"
+                                     Text="加入房间" />
+                    </Grid>
+
+                    <!-- 版本或加载器不一致二次确认 -->
+                    <Border IsVisible="{Binding HasPendingVersionMismatch}"
+                            BorderBrush="{DynamicResource ColorBrush3}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12">
+                        <StackPanel Spacing="8">
+                            <TextBlock FontWeight="SemiBold"
+                                       TextWrapping="Wrap"
+                                       Text="{Binding VersionMismatchMessage}" />
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="10">
+                                <ui:MyButton MinWidth="120"
+                                             Height="32"
+                                             ColorType="Highlight"
+                                             Command="{Binding ConfirmForceJoinCommand}"
+                                             IsEnabled="{Binding IsNotBusy}"
+                                             Text="忽略差异并加入" />
+                                <ui:MyButton MinWidth="90"
+                                             Height="32"
+                                             Command="{Binding CancelForceJoinCommand}"
+                                             Text="取消" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ui:MyCard>
+
+            <!-- 6. 收到的好友联机邀请 -->
+            <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding HasIncomingInvites}"
+                       Title="收到的好友联机邀请">
                 <StackPanel Margin="25,40,25,20"
                             Spacing="8">
-                    <TextBlock LineHeight="20"
-                               TextWrapping="Wrap"
-                               Text="本客户端仅保留梦港联机（TCP/TLS 中继），不接入第三方 P2P 组网组件或额外大厅账号体系。" />
-                    <TextBlock LineHeight="20"
-                               TextWrapping="Wrap"
-                               Text="当前 PoC 阶段支持探测站点联机账号状态与 /api/lobby/config 中继节点下发配置；房间创建、房码加入与局域网端口转发将在 Phase 4 完整接入。" />
+                    <ItemsControl ItemsSource="{Binding IncomingInvites}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="dpvm:DreamPortLobbyInviteItemVm">
+                                <Border Margin="0,6,0,0"
+                                        BorderBrush="{DynamicResource ColorBrushGray4}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12">
+                                    <Grid ColumnDefinitions="*,Auto"
+                                          ColumnSpacing="10">
+                                        <StackPanel Grid.Column="0"
+                                                    Spacing="3">
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Text="{Binding HeaderText}" />
+                                            <TextBlock IsVisible="{Binding HasMessage}"
+                                                       TextWrapping="Wrap"
+                                                       Text="{Binding Message}" />
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{DynamicResource ColorBrushGray4}"
+                                                       Text="{Binding DetailText}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1"
+                                                    Orientation="Horizontal"
+                                                    Spacing="8"
+                                                    VerticalAlignment="Center">
+                                            <ui:MyButton MinWidth="84"
+                                                         Height="32"
+                                                         ColorType="Highlight"
+                                                         Command="{Binding AcceptCommand}"
+                                                         Text="接受并加入" />
+                                            <ui:MyButton MinWidth="70"
+                                                         Height="32"
+                                                         Command="{Binding RejectCommand}"
+                                                         Text="拒绝" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ui:MyCard>
+
+            <!-- 7. 公开大厅房间列表（仅空闲态可见） -->
+            <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding IsIdle}"
+                       Title="公开联机大厅">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="10">
+                        <TextBlock Grid.Column="0"
+                                   VerticalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   Text="{Binding PublicRoomsSummaryText}" />
+                        <ui:MyButton Grid.Column="1"
+                                     MinWidth="96"
+                                     Height="32"
+                                     Command="{Binding RefreshStatusCommand}"
+                                     IsEnabled="{Binding IsNotBusy}"
+                                     Text="刷新列表" />
+                    </Grid>
+
+                    <TextBlock IsVisible="{Binding HasNoPublicRooms}"
+                               FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               Text="当前暂无公开房间。登录后可点击上方「开始开房」，或向好友索取房间码加入。" />
+
+                    <ItemsControl IsVisible="{Binding HasPublicRooms}"
+                                  ItemsSource="{Binding PublicRooms}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="dpvm:DreamPortLobbyRoomItemVm">
+                                <Border Margin="0,6,0,0"
+                                        BorderBrush="{DynamicResource ColorBrushGray4}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12">
+                                    <Grid ColumnDefinitions="*,Auto"
+                                          ColumnSpacing="10">
+                                        <StackPanel Grid.Column="0"
+                                                    Spacing="3">
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Text="{Binding HeaderText}" />
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{DynamicResource ColorBrushGray4}"
+                                                       TextWrapping="Wrap"
+                                                       Text="{Binding DetailText}" />
+                                        </StackPanel>
+                                        <ui:MyButton Grid.Column="1"
+                                                     MinWidth="84"
+                                                     Height="32"
+                                                     ColorType="Highlight"
+                                                     VerticalAlignment="Center"
+                                                     Command="{Binding JoinCommand}"
+                                                     Text="加入" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ui:MyCard>
+
+            <!-- 8. 联机事件日志 -->
+            <ui:MyCard Margin="0,0,0,15"
+                       IsVisible="{Binding HasEventLogs}"
+                       Title="最近联机记录">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="6">
+                    <ItemsControl ItemsSource="{Binding EventLogs}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Margin="0,2,0,0"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource ColorBrushGray4}"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </ui:MyCard>
         </StackPanel>

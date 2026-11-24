@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DreamPort.Core.Config;
+using DreamPort.Core.Lobby;
 
 namespace DreamPort.Core.Api;
 
@@ -1260,6 +1261,392 @@ public sealed partial class DreamPortApiClient : IDisposable
         text = MdInlineCodePattern().Replace(text, "$1");
         text = MdMultiBlankLinesPattern().Replace(text, "\n\n");
         return text.Trim();
+    }
+
+    private const string LobbyCodeAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+    /// <summary>规范化 8 位梦港房间码（大写、去连字符/空白/下划线）。</summary>
+    public static string NormalizeRoomCode(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return string.Empty;
+
+        var sb = new StringBuilder(raw.Length);
+        foreach (var ch in raw.Trim())
+        {
+            if (ch == '-' || ch == '_' || char.IsWhiteSpace(ch))
+                continue;
+            sb.Append(char.ToUpperInvariant(ch));
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>校验是否符合梦港 8 位 Base32 房间码格式（不含 I / O / L / U 以外的合法字符集）。</summary>
+    public static bool IsValidRoomCodeFormat(string? normalized)
+    {
+        if (string.IsNullOrEmpty(normalized) || normalized.Length != 8)
+            return false;
+
+        foreach (var ch in normalized)
+        {
+            if (LobbyCodeAlphabet.IndexOf(ch) < 0)
+                return false;
+        }
+
+        return true;
+    }
+
+    public async Task<DreamPortLobbyRoomsResult> GetLobbyRoomsAsync(CancellationToken ct = default)
+    {
+        var res = await SendAsync(HttpMethod.Get, "/api/lobby/rooms", auth: false, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取联机大厅列表失败", out var reason, out var error))
+            return new DreamPortLobbyRoomsResult(false, [], error, reason);
+
+        var data = UnwrapData(res.Body);
+        var rooms = new List<DreamPortLobbyRoom>();
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("rooms", out var roomsEl)
+            && roomsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var row in roomsEl.EnumerateArray())
+            {
+                var room = ParseLobbyRoom(row);
+                if (room is not null)
+                    rooms.Add(room);
+            }
+        }
+
+        return new DreamPortLobbyRoomsResult(true, rooms);
+    }
+
+    public async Task<DreamPortLobbyMyRoomResult> GetMyLobbyRoomAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortLobbyMyRoomResult(false, null, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Get, "/api/lobby/rooms/mine", auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "查询我的房间失败", out var reason, out var error))
+            return new DreamPortLobbyMyRoomResult(false, null, error, reason);
+
+        var data = UnwrapData(res.Body);
+        DreamPortLobbyRoom? room = null;
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("room", out var roomEl)
+            && roomEl.ValueKind == JsonValueKind.Object)
+        {
+            room = ParseLobbyRoom(roomEl);
+        }
+
+        return new DreamPortLobbyMyRoomResult(true, room);
+    }
+
+    public async Task<DreamPortLobbyCreateResult> CreateLobbyRoomAsync(
+        string name,
+        string visibility = "public",
+        string? mcVersion = null,
+        string? modLoader = null,
+        string? modHash = null,
+        IReadOnlyList<string>? modList = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortLobbyCreateResult(false, null, null, 0, "未登录", DreamPortFailureReason.Expired);
+
+        var payload = new
+        {
+            name = (name ?? string.Empty).Trim(),
+            visibility = string.Equals(visibility, "private", StringComparison.OrdinalIgnoreCase) ? "private" : "public",
+            mcVersion = (mcVersion ?? string.Empty).Trim(),
+            modHash = (modHash ?? string.Empty).Trim(),
+            modList = modList ?? [],
+            modLoader = (modLoader ?? string.Empty).Trim().ToLowerInvariant()
+        };
+
+        var res = await SendAsync(HttpMethod.Post, "/api/lobby/rooms", payload, auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "创建联机房间失败", out var reason, out var error))
+            return new DreamPortLobbyCreateResult(false, null, null, 0, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var room = data.ValueKind == JsonValueKind.Object && data.TryGetProperty("room", out var roomEl)
+            ? ParseLobbyRoom(roomEl)
+            : null;
+        var ticket = FirstNonBlank(data, "ticket");
+        var ttl = GetInt(data, "ticketTtlSeconds") ?? 0;
+
+        if (room is null || string.IsNullOrWhiteSpace(ticket))
+            return new DreamPortLobbyCreateResult(false, room, ticket, ttl, "服务端未返回有效房间信息或房票");
+
+        return new DreamPortLobbyCreateResult(true, room, ticket, ttl, ExtractMessage(res.Body, "房间已创建"));
+    }
+
+    public async Task<DreamPortLobbyJoinResult> JoinLobbyRoomAsync(
+        string code,
+        string? mcVersion = null,
+        string? modHash = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortLobbyJoinResult(false, null, null, 0, null, null, "未登录", DreamPortFailureReason.Expired);
+
+        var normalized = NormalizeRoomCode(code);
+        if (string.IsNullOrEmpty(normalized))
+            return new DreamPortLobbyJoinResult(false, null, null, 0, null, null, "请输入有效的房间码");
+
+        var payload = new
+        {
+            mcVersion = (mcVersion ?? string.Empty).Trim(),
+            modHash = (modHash ?? string.Empty).Trim()
+        };
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            $"/api/lobby/rooms/{Uri.EscapeDataString(normalized)}/join",
+            payload,
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+
+        if (res.Status == 404)
+        {
+            var data404 = UnwrapData(res.Body);
+            var reasonCode = FirstNonBlank(data404, "reason") ?? DreamPortRelayWire.ReasonRoomNotFound;
+            var msg404 = ExtractMessage(res.Body, DreamPortRelayWire.RejectMessage(reasonCode));
+            return new DreamPortLobbyJoinResult(false, null, null, 0, null, reasonCode, msg404);
+        }
+
+        if (TryClassifyFailure(res, "加入联机房间失败", out var reason, out var error))
+            return new DreamPortLobbyJoinResult(false, null, null, 0, null, null, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var room = data.ValueKind == JsonValueKind.Object && data.TryGetProperty("room", out var roomEl)
+            ? ParseLobbyRoom(roomEl)
+            : null;
+        var ticket = FirstNonBlank(data, "ticket");
+        var ttl = GetInt(data, "ticketTtlSeconds") ?? 0;
+
+        DreamPortLobbyJoinDiff? diff = null;
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("diff", out var diffEl)
+            && diffEl.ValueKind == JsonValueKind.Object)
+        {
+            diff = new DreamPortLobbyJoinDiff(
+                VersionMismatch: GetBool(diffEl, "versionMismatch"),
+                RoomVersion: GetString(diffEl, "roomVersion") ?? string.Empty,
+                MyVersion: GetString(diffEl, "myVersion") ?? string.Empty);
+        }
+
+        if (room is null || string.IsNullOrWhiteSpace(ticket))
+            return new DreamPortLobbyJoinResult(false, room, ticket, ttl, diff, null, "服务端未返回有效房间或访客房票");
+
+        return new DreamPortLobbyJoinResult(true, room, ticket, ttl, diff, null, ExtractMessage(res.Body, "可以加入"));
+    }
+
+    public async Task<DreamPortApiActionResult> CloseLobbyRoomAsync(string code, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortApiActionResult(false, "未登录", DreamPortFailureReason.Expired);
+
+        var normalized = NormalizeRoomCode(code);
+        if (string.IsNullOrEmpty(normalized))
+            return new DreamPortApiActionResult(false, "房间码不能为空");
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            $"/api/lobby/rooms/{Uri.EscapeDataString(normalized)}/close",
+            new { },
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+        return ToActionResult(res, "房间已关闭", "关闭房间失败");
+    }
+
+    public async Task<DreamPortLobbyInvitesResult> GetLobbyInvitesAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortLobbyInvitesResult(false, [], [], 0, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Get, "/api/lobby/invites", auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取联机邀请失败", out var reason, out var error))
+            return new DreamPortLobbyInvitesResult(false, [], [], 0, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var incoming = ParseLobbyInviteArray(data, "incoming");
+        var outgoing = ParseLobbyInviteArray(data, "outgoing");
+        var ttl = GetInt(data, "ttlSeconds") ?? 1800;
+        return new DreamPortLobbyInvitesResult(true, incoming, outgoing, ttl);
+    }
+
+    public async Task<DreamPortApiActionResult> InviteFriendToRoomAsync(
+        string code,
+        string username,
+        string? message = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortApiActionResult(false, "未登录", DreamPortFailureReason.Expired);
+
+        var normalized = NormalizeRoomCode(code);
+        if (string.IsNullOrEmpty(normalized) || string.IsNullOrWhiteSpace(username))
+            return new DreamPortApiActionResult(false, "请选择要邀请的好友");
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            $"/api/lobby/rooms/{Uri.EscapeDataString(normalized)}/invite",
+            new
+            {
+                username = username.Trim(),
+                message = string.IsNullOrWhiteSpace(message) ? null : message.Trim()
+            },
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+        return ToActionResult(res, "已向好友发送联机邀请", "发送联机邀请失败");
+    }
+
+    public async Task<DreamPortLobbyAcceptInviteResult> AcceptLobbyInviteAsync(long inviteId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortLobbyAcceptInviteResult(false, null, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            $"/api/lobby/invites/{inviteId}/accept",
+            new { },
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "接受联机邀请失败", out var reason, out var error))
+            return new DreamPortLobbyAcceptInviteResult(false, null, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var code = FirstNonBlank(data, "code");
+        if (string.IsNullOrEmpty(code))
+            return new DreamPortLobbyAcceptInviteResult(false, null, "未返回房间码");
+
+        return new DreamPortLobbyAcceptInviteResult(true, NormalizeRoomCode(code), ExtractMessage(res.Body, "已接受邀请"));
+    }
+
+    public async Task<DreamPortApiActionResult> RejectLobbyInviteAsync(long inviteId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortApiActionResult(false, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            $"/api/lobby/invites/{inviteId}/reject",
+            new { },
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+        return ToActionResult(res, "已拒绝邀请", "拒绝邀请失败");
+    }
+
+    public async Task<DreamPortApiActionResult> CancelLobbyInviteAsync(long inviteId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortApiActionResult(false, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            $"/api/lobby/invites/{inviteId}/cancel",
+            new { },
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+        return ToActionResult(res, "已撤回邀请", "撤回邀请失败");
+    }
+
+    public async Task<DreamPortFriendsResult> GetFriendsAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortFriendsResult(false, [], "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Get, "/api/friends", auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取好友列表失败", out var reason, out var error))
+            return new DreamPortFriendsResult(false, [], error, reason);
+
+        var data = UnwrapData(res.Body);
+        var friends = new List<string>();
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("friends", out var friendsEl)
+            && friendsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in friendsEl.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                    continue;
+                var username = FirstNonBlank(item, "username");
+                if (!string.IsNullOrEmpty(username))
+                    friends.Add(username);
+            }
+        }
+
+        return new DreamPortFriendsResult(true, friends);
+    }
+
+    private static DreamPortLobbyRoom? ParseLobbyRoom(JsonElement el)
+    {
+        if (el.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var code = NormalizeRoomCode(GetString(el, "code"));
+        if (string.IsNullOrEmpty(code))
+            return null;
+
+        var modList = new List<string>();
+        if (el.TryGetProperty("modList", out var modsEl) && modsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var m in modsEl.EnumerateArray())
+            {
+                var name = m.ValueKind == JsonValueKind.String ? m.GetString() : m.ToString();
+                if (!string.IsNullOrWhiteSpace(name))
+                    modList.Add(name.Trim());
+            }
+        }
+
+        return new DreamPortLobbyRoom(
+            Code: code,
+            Host: GetString(el, "host") ?? string.Empty,
+            Name: GetString(el, "name") ?? code,
+            Visibility: GetString(el, "visibility") ?? "public",
+            MaxPlayers: GetInt(el, "maxPlayers") ?? 8,
+            McVersion: GetString(el, "mcVersion") ?? string.Empty,
+            ModLoader: GetString(el, "modLoader") ?? string.Empty,
+            ModHash: GetString(el, "modHash") ?? string.Empty,
+            ModList: modList,
+            Status: GetString(el, "status") ?? "open",
+            CreatedAtMs: GetLong(el, "createdAt") ?? 0,
+            Occupancy: GetInt(el, "occupancy"),
+            HostGone: GetBool(el, "hostGone"));
+    }
+
+    private static IReadOnlyList<DreamPortLobbyInviteItem> ParseLobbyInviteArray(JsonElement parent, string propertyName)
+    {
+        var items = new List<DreamPortLobbyInviteItem>();
+        if (parent.ValueKind != JsonValueKind.Object
+            || !parent.TryGetProperty(propertyName, out var listEl)
+            || listEl.ValueKind != JsonValueKind.Array)
+            return items;
+
+        foreach (var row in listEl.EnumerateArray())
+        {
+            if (row.ValueKind != JsonValueKind.Object)
+                continue;
+            var id = GetLong(row, "id") ?? 0;
+            var code = NormalizeRoomCode(GetString(row, "code"));
+            if (id <= 0 || string.IsNullOrEmpty(code))
+                continue;
+
+            items.Add(new DreamPortLobbyInviteItem(
+                Id: id,
+                Code: code,
+                Inviter: GetString(row, "inviter") ?? string.Empty,
+                Invitee: GetString(row, "invitee") ?? string.Empty,
+                Message: FirstNonBlank(row, "message"),
+                CreatedAtMs: GetLong(row, "createdAt") ?? 0,
+                ExpiresAtMs: GetLong(row, "expiresAt") ?? 0,
+                RoomOpen: GetBool(row, "roomOpen"),
+                RoomName: FirstNonBlank(row, "roomName"),
+                McVersion: FirstNonBlank(row, "mcVersion"),
+                MaxPlayers: GetInt(row, "maxPlayers")));
+        }
+
+        return items;
     }
 
     public void Dispose()

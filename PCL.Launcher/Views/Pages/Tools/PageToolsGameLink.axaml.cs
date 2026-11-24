@@ -1,14 +1,14 @@
+using System.ComponentModel;
 using Avalonia.Interactivity;
+using DreamPort.UI.ViewModels;
 using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Tools;
 
-/// <summary>工具页中的梦港联机大厅页（仅梦港 TCP/TLS 中继）。</summary>
+/// <summary>工具页中的梦港联机大厅页（仅梦港 TCP/TLS 中继与局域网广播）。</summary>
 public partial class PageToolsGameLink : MyPageRight
 {
-    private bool _loadedOnce;
-
     public PageToolsGameLink()
     {
         InitializeComponent();
@@ -16,9 +16,8 @@ public partial class PageToolsGameLink : MyPageRight
         Current = this;
         DataContext = ViewModel;
 
-        BtnGoDreamPortAccount.Click += (_, _) =>
-            Navigation.GoTo(new PageLocation(PageIds.Tools, SubPageIds.ToolsDreamPortAccount));
-
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        UpdateHintTheme();
         Loaded += OnPageLoaded;
     }
 
@@ -31,11 +30,42 @@ public partial class PageToolsGameLink : MyPageRight
         ViewModel.Reload();
     }
 
-    private void OnPageLoaded(object? sender, RoutedEventArgs e)
+    public override async void OnNavigatedTo(PageParameter? parameter)
     {
-        if (_loadedOnce)
-            return;
-        _loadedOnce = true;
-        ViewModel.Reload();
+        base.OnNavigatedTo(parameter);
+        await SafeSyncAsync();
+    }
+
+    private async void OnPageLoaded(object? sender, RoutedEventArgs e)
+    {
+        await SafeSyncAsync();
+    }
+
+    private async Task SafeSyncAsync()
+    {
+        try
+        {
+            await ViewModel.InitializeOrSyncAsync();
+        }
+        catch
+        {
+            // ViewModel 内部已处理网络与会话状态异常
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DreamPortLobbyViewModel.HintLevel))
+            UpdateHintTheme();
+    }
+
+    private void UpdateHintTheme()
+    {
+        HintStatus.Theme = ViewModel.HintLevel switch
+        {
+            DreamPortHintLevel.Error => MyHint.Themes.Red,
+            DreamPortHintLevel.Warning => MyHint.Themes.Yellow,
+            _ => MyHint.Themes.Blue
+        };
     }
 }

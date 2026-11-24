@@ -5,7 +5,7 @@
 > [PCL Community Edition (PCL CE)](https://github.com/PCL-Community/PCL-CE)
 > 独立进行二次创作的衍生修改版，与龙腾猫跃及 PCL 官方无关联。请勿向 PCL / PCL CE 上游反馈本分支的问题。
 
-## 当前阶段（Phase 3）已实现能力
+## 当前阶段（Phase 4）已实现能力
 
 - **跨平台底座**：基于 .NET 10 / C# 15 / Avalonia 12，支持 macOS（ARM64 / x64）、Windows 与 Linux
 - **合规底座与隔离**：
@@ -13,7 +13,7 @@
   - Windows 主色相锁定 PCL 蓝色系，禁用上游 Sentry 与联机遥测上报
   - 应用数据目录独立隔离为 `PCL-DreamPort`，不影响原有 PCL CE 数据
 - **仅正版游戏账号**：屏蔽离线登录与外置登录入口，保留微软正版登录并内置设备码扫描二维码
-- **联机能力**：完全移除 EasyTier 与 Natayark ID 相关模块及配置，仅保留梦港联机（TCP/TLS 中继）与局域网广播发现入口（房间创建/加入/中继转发在 Phase 4 全量接入）
+- **梦港联机（TCP/TLS 中继 + 局域网广播）**：完全移除 EasyTier 与 Natayark ID，原生实现仅基于 TCP/TLS 中继的 `DreamPort-Relay` 联机大厅——支持单人开房（自动监听 `224.0.2.60:4445` 或手动指定游戏端口、局域网本地探活、10 秒 `host_status` 宽限保活、成员列表与踢出/解除拉黑、好友列表勾选邀请与撤回、异常退出残留房间自救与退出自动关房）、好友/公开大厅加房（房码格式化与校验、MC 版本/加载器差异二次确认、多连接并发转发、本地 `127.0.0.1:<port>` 监听 + 局域网伪装广播直显游戏多人列表、`host_gone`/`host_back`/`kicked`/`room_closed` 事件联动）
 - **下载与更新源分工**：游戏数据下载沿用 PCL 原生官方源 / BMCLAPI 并隔离下载层 User-Agent（`PCL-DreamPort/{version}`）；梦港加速源（`https://dl.xmcraft.cn`，`DP_UPDATE_MIRROR_URL`）仅用于启动器更新等配套服务
 - **完整梦港账号系统与多设备管理**：「工具 → 梦港账号」支持配置站点地址（切换站点自动向旧站点 `/api/logout` 注销并清理旧凭据与主页缓存）、浏览器确认 + 同码扫码授权登录（`/api/qr-login/*`）、网页注册/安全与通行密钥/封禁申诉快捷直达、系统加密存储（DPAPI / Keychain）、严格区分会话过期（401）与网络波动，以及活跃设备查看与单设备/批量踢出（`/api/auth/sessions*`）
 - **六步入服引导流程（原生 PCL 控件）**：对接 `/api/user/progress` 实时展示六步进度，内置 QQ 绑定/解绑（`/api/user/qq/*`）、使用当前启动器已登录微软正版档案一键验证正版 ID（`POST /api/user/minecraft/verify-token`）及微软设备码备用验证、邀请码入服（`POST /api/invite/apply`）、可交互入服问卷与 SSE 实时逐题 AI 评分反馈（`/api/questionnaire/{config,stream,submit}`），以及被拒绝/封禁状态引导与问卷人工复核申诉（`/api/questionnaire/appeal*`）
