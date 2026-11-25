@@ -18,9 +18,14 @@ on:
     paths-ignore: *ignored
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: build (${{ matrix.rid }})
+    if: ${{ github.server_url == 'https://github.com' || matrix.rid == 'linux-x64' }}
     strategy:
       fail-fast: false
       matrix:
@@ -62,6 +67,7 @@ jobs:
 
   test:
     name: test (${{ matrix.os }})
+    if: ${{ github.server_url == 'https://github.com' || matrix.os == 'ubuntu-latest' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false

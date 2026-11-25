@@ -60,7 +60,7 @@ public class RecycleBinTest
         Directory.CreateDirectory(source);
         File.WriteAllText(Path.Combine(source, "options.txt"), "fov:0.0");
 
-        Assert.IsTrue(_bin.IsSupported(source), "工作区位于用户主目录下，应支持回收站");
+        RequireRecycleBinSupport(source);
 
         var outcome = _bin.Move(source, out var error);
 
@@ -84,6 +84,7 @@ public class RecycleBinTest
     {
         var source = Path.Combine(_sandboxRoot, "world.zip");
         File.WriteAllText(source, "zip-bytes");
+        RequireRecycleBinSupport(source);
 
         var outcome = _bin.Move(source, out var error);
 
@@ -97,6 +98,7 @@ public class RecycleBinTest
     {
         var first = Path.Combine(_sandboxRoot, "saves");
         Directory.CreateDirectory(first);
+        RequireRecycleBinSupport(first);
         Assert.AreEqual(RecycleBinOutcome.Moved, _bin.Move(first, out _));
 
         var second = Path.Combine(_sandboxRoot, "saves");
@@ -114,5 +116,11 @@ public class RecycleBinTest
         var outcome = _bin.Move(Path.Combine(_sandboxRoot, "not-there"), out var error);
         Assert.AreEqual(RecycleBinOutcome.Failed, outcome);
         Assert.IsFalse(string.IsNullOrWhiteSpace(error));
+    }
+
+    private void RequireRecycleBinSupport(string path)
+    {
+        if (!_bin.IsSupported(path))
+            Assert.Inconclusive("当前 Linux 文件系统不支持 XDG 回收站");
     }
 }
