@@ -60,6 +60,31 @@ export PCL_PACKAGE_KIND=macos-app
 export PCL_DATA_DIR="${PCL_DATA_DIR:-$HOME/PCL-DreamPort}"
 export PCL_MINECRAFT_DIR="${PCL_MINECRAFT_DIR:-$HOME/PCL-DreamPort/.minecraft}"
 
+dotnet_root_has_runtime() {
+  [ -x "$1/dotnet" ] || return 1
+  "$1/dotnet" --list-runtimes 2>/dev/null | grep -q '^Microsoft.NETCore.App 10\.'
+}
+
+# Dock and Finder launch with a minimal environment, so detect user-local .NET installs explicitly.
+if [ -n "${DOTNET_ROOT:-}" ] && ! dotnet_root_has_runtime "$DOTNET_ROOT"; then
+  unset DOTNET_ROOT
+fi
+if [ -z "${DOTNET_ROOT:-}" ]; then
+  for candidate in \
+    "$HOME/.dotnet" \
+    /usr/local/share/dotnet \
+    /opt/homebrew/opt/dotnet/libexec \
+    /usr/local/opt/dotnet/libexec \
+    /usr/share/dotnet
+  do
+    if dotnet_root_has_runtime "$candidate"; then
+      DOTNET_ROOT="$candidate"
+      export DOTNET_ROOT
+      break
+    fi
+  done
+fi
+
 exec "$HERE/PCL.Launcher" "$@"
 LAUNCHER
 chmod 0755 "$APP/Contents/MacOS/launcher"
