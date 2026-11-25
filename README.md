@@ -25,7 +25,7 @@
 - **六步入服引导流程（原生 PCL 控件）**：对接 `/api/user/progress` 实时展示六步进度，内置 QQ 绑定/解绑（`/api/user/qq/*`）、使用当前启动器已登录微软正版档案一键验证正版 ID（`POST /api/user/minecraft/verify-token`）及微软设备码备用验证、邀请码入服（`POST /api/invite/apply`）、可交互入服问卷与 SSE 实时逐题 AI 评分反馈（`/api/questionnaire/{config,stream,submit}`），以及被拒绝/封禁状态引导与问卷人工复核申诉（`/api/questionnaire/appeal*`）
 - **每日自动签到、积分与称号管理**：启动器启动与账号校验时自动为已过审玩家执行每日一次静默签到并按自然日去重（`POST /api/points/signin`）；「梦港账号」页展示积分余额、签到天数、待领任务数并支持手动签到、跳转任务中心及查看/佩戴/卸下已拥有称号（`/api/points/center`、`/api/titles/*`）
 - **服务器公告与站内通知中心**：新增「工具 → 公告与通知」页及标题栏右上角通知图标与实时未读数字角标，支持免登录浏览官网服务器公告资讯（`GET /api/announcements`），以及登录后按未读筛选通知、单条/全部已读与安全链接跳转（`/api/notifications*`）
-- **PCL 原生自定义主页推送**：启动器首页默认接入站点 `GET /api/client/pcl-homepage` 与 `/version`（支持版本比对与服务端自动从网页端主页编排翻译或自定义 XAML 下发），并对版本接口与缓存内容校验防污染，不可达或离线时静默回退至本地 XAML 原型
+- **PCL 原生自定义主页推送**：启动器首页默认接入站点 `GET /api/client/pcl-homepage` 与 `/version`（支持版本比对与服务端自动从网页端主页编排翻译或自定义 XAML 下发），自动翻译支持 Hero 背景图、轮播图片与照片墙，站内图片地址自动补全；网络图片通过 `MyImage` 下载并缓存。对版本接口与缓存内容校验防污染，不可达或离线时静默回退至本地 XAML 原型
 
 ## 运行环境要求
 
