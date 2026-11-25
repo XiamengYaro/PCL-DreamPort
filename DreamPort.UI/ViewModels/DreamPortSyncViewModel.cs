@@ -187,7 +187,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private bool _hasProfileConflict;
 
     // AI Log Diagnose state
-    [ObservableProperty] private string _logDiagnoseStatusSummary = "点击「检查/准备脱敏日志」读取当前实例的崩溃报告与 latest.log（发送前自动脱敏玩家名、用户目录与令牌）。";
+    [ObservableProperty] private string _logDiagnoseStatusSummary = "点击「提交 AI 诊断」读取当前实例的崩溃报告与 latest.log；发送前自动脱敏玩家名、用户目录与令牌。";
     [ObservableProperty] private string _logDiagnosePreviewSummary = string.Empty;
     [ObservableProperty] private string _logDiagnoseResultSummary = string.Empty;
     [ObservableProperty] private string _logDiagnoseAskForText = string.Empty;
@@ -335,7 +335,11 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
             await RefreshCloudSavesAsync(ct);
             await RefreshProfileSyncAsync(ct);
         }
+    }
 
+    public async Task InitializeLogDiagnoseAsync(CancellationToken ct = default)
+    {
+        SyncSessionAndInstance();
         await RefreshLogDiagnoseStatusAsync(ct);
     }
 
@@ -971,15 +975,16 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
         LogDiagnoseStatusSummary = $"AI 日志诊断服务已启用（{quotaLabel}；登录即可使用，发送前自动脱敏玩家名/用户目录/令牌）。";
     }
 
-    [RelayCommand]
-    public void PrepareLogDiagnose()
+    private bool TryPrepareLogDiagnose()
     {
         SyncSessionAndInstance();
+        _preparedDiagnosePayload = null;
+        LogDiagnosePreviewSummary = string.Empty;
         var (instDir, instName, instVer, instLoader) = ResolveSelectedInstance();
         if (string.IsNullOrWhiteSpace(instDir) || !Directory.Exists(instDir))
         {
-            SetStatus("请先在「启动」页选择一个有效的 Minecraft 实例再准备脱敏日志。", DreamPortHintLevel.Warning);
-            return;
+            SetStatus("请先在「启动」页选择一个有效的 Minecraft 实例再提交 AI 诊断。", DreamPortHintLevel.Warning);
+            return false;
         }
 
         int? modCount = null;
@@ -1010,6 +1015,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
         var crashLabel = string.IsNullOrWhiteSpace(payload.CrashReportName) ? "无崩溃报告" : $"含崩溃报告 {payload.CrashReportName}";
         var truncLabel = payload.Truncated ? "（已按预算裁剪末尾关键片段）" : "（完整片段）";
         LogDiagnosePreviewSummary = $"已生成脱敏日志：{payload.CharCount} 字符，{crashLabel}{truncLabel}。上下文仅包含实例版本、加载器与模组数量，不含文件路径与登录凭据。";
+        return true;
     }
 
     [RelayCommand]
@@ -1025,9 +1031,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
             return;
         }
 
-        if (_preparedDiagnosePayload is null)
-            PrepareLogDiagnose();
-        if (_preparedDiagnosePayload is null)
+        if (!TryPrepareLogDiagnose() || _preparedDiagnosePayload is not { } payload)
             return;
 
         var cts = new CancellationTokenSource();
@@ -1043,7 +1047,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
         {
             res = await DreamPortLogDiagnoseService.RunAsync(
                 _api,
-                _preparedDiagnosePayload,
+                payload,
                 msg => DispatchUi(() => LogDiagnoseResultSummary = msg),
                 ct: cts.Token);
         }

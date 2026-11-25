@@ -37,8 +37,6 @@ public partial class PageSetupAbout : MyPageRight
         BtnUpstreamSource.Click += (_, _) => Basics.OpenPath("https://github.com/Meloong-Git/PCL");
         BtnSponsorMirror.Click += (_, _) => Basics.OpenPath("https://afdian.com/a/bangbang93");
         BtnMcmod.Click += (_, _) => Basics.OpenPath("https://www.mcmod.cn");
-        BtnPysioBlog.Click += (_, _) => Basics.OpenPath("https://www.pysio.online");
-        BtnYunmoanWebsite.Click += (_, _) => Basics.OpenPath("https://www.zyghit.cn");
 
         Loaded += (_, _) =>
         {

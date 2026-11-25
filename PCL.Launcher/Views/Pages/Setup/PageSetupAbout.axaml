@@ -36,10 +36,9 @@
                                 Width="34"
                                 Height="34"
                                 Margin="3"
-                                CornerRadius="17"
                                 VerticalAlignment="Center"
                                 IsHitTestVisible="{Binding IsLogoClickEnabled}"
-                                Source="avares://PCL.Launcher/Assets/Images/Heads/Logo-CE.png"
+                                Source="avares://PCL.Launcher/Assets/Images/icon.png"
                                 PointerPressed="ImgPCLLogo_PointerPressed" />
 
                     <ui:MyListItem Grid.Row="0"
@@ -84,7 +83,7 @@
                 <Grid x:Name="PanThanks"
                       Margin="21,40,21,16"
                       ColumnDefinitions="40,*,150"
-                      RowDefinitions="45,45,45,45,45,45">
+                      RowDefinitions="45,45,45">
                     <ui:MyImage Grid.Row="0"
                                 Grid.Column="0"
                                 Width="34"
@@ -134,70 +133,14 @@
                                 Margin="3"
                                 CornerRadius="17"
                                 VerticalAlignment="Center"
-                                Source="avares://PCL.Launcher/Assets/Images/Heads/Pysio.jpg" />
-                    <ui:MyListItem Grid.Row="2"
-                                   Grid.Column="1"
-                                   Margin="-5,0,0,0"
-                                   IsHitTestVisible="False"
-                                   Info="{loc:Loc Setup.About.SpecialThanks.Info.Cloud}"
-                                   Title="{loc:Loc Setup.About.SpecialThanks.Name.Pysio}" />
-                    <ui:MyButton x:Name="BtnPysioBlog"
-                                 Grid.Row="2"
-                                 Grid.Column="2"
-                                 Height="35"
-                                 Text="{loc:Loc Setup.About.SpecialThanks.GoBlog}" />
-
-                    <ui:MyImage Grid.Row="3"
-                                Grid.Column="0"
-                                Width="34"
-                                Height="34"
-                                Margin="3"
-                                CornerRadius="17"
-                                VerticalAlignment="Center"
-                                Source="avares://PCL.Launcher/Assets/Images/Heads/Yunmoan.jpg" />
-                    <ui:MyListItem Grid.Row="3"
-                                   Grid.Column="1"
-                                   Margin="-5,0,0,0"
-                                   IsHitTestVisible="False"
-                                   Info="{loc:Loc Setup.About.SpecialThanks.Info.Cloud}"
-                                   Title="{loc:Loc Setup.About.SpecialThanks.Name.Yunmoan}" />
-                    <ui:MyButton x:Name="BtnYunmoanWebsite"
-                                 Grid.Row="3"
-                                 Grid.Column="2"
-                                 Height="35"
-                                 Text="{loc:Loc Setup.About.SpecialThanks.OpenWebsite}" />
-
-                    <ui:MyImage Grid.Row="4"
-                                Grid.Column="0"
-                                Width="34"
-                                Height="34"
-                                Margin="3"
-                                CornerRadius="17"
-                                VerticalAlignment="Center"
                                 Source="avares://PCL.Launcher/Assets/Images/Heads/z0z0r4.png" />
-                    <ui:MyListItem Grid.Row="4"
+                    <ui:MyListItem Grid.Row="2"
                                    Grid.Column="1"
                                    Grid.ColumnSpan="2"
                                    Margin="-5,0,0,0"
                                    IsHitTestVisible="False"
                                    Info="{loc:Loc Setup.About.SpecialThanks.Info.Mcim}"
                                    Title="{loc:Loc Setup.About.SpecialThanks.Name.Z0z0r4}" />
-
-                    <ui:MyImage Grid.Row="5"
-                                Grid.Column="0"
-                                Width="34"
-                                Height="34"
-                                Margin="3"
-                                CornerRadius="17"
-                                VerticalAlignment="Center"
-                                Source="avares://PCL.Launcher/Assets/Images/Heads/Emperormummy.png" />
-                    <ui:MyListItem Grid.Row="5"
-                                   Grid.Column="1"
-                                   Grid.ColumnSpan="2"
-                                   Margin="-5,0,0,0"
-                                   IsHitTestVisible="False"
-                                   Info="{loc:Loc Setup.About.SpecialThanks.Info.IconDesign}"
-                                   Title="{loc:Loc Setup.About.SpecialThanks.Name.Emperormummy}" />
                 </Grid>
             </ui:MyCard>
 

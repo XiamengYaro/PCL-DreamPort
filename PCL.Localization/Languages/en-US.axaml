@@ -3711,6 +3711,7 @@
     <sys:String x:Key="Tools.Left.DreamPort">DreamPort</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortAccount">DreamPort Account</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortCommunity">News &amp; Notifications</sys:String>
+    <sys:String x:Key="Tools.Left.DreamPortAiDiagnose">AI Diagnostics</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortSync">Sync &amp; Tools</sys:String>
     <sys:String x:Key="Main.Menu.Notifications">Notifications &amp; Announcements</sys:String>
 </ResourceDictionary>

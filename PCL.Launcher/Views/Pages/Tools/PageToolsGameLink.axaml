@@ -15,39 +15,8 @@
                        Theme="Blue"
                        Text="{Binding StatusHint}" />
 
-            <!-- 1. 梦港联机服务与账号概览 -->
-            <ui:MyCard Margin="0,15"
-                       Title="梦港联机（TCP/TLS 安全中继）">
-                <StackPanel Margin="25,40,25,20"
-                            Spacing="10">
-                    <TextBlock TextWrapping="Wrap"
-                               Text="{Binding AccountSummary, StringFormat='梦港账号：{0}'}" />
-                    <TextBlock TextWrapping="Wrap"
-                               Foreground="{DynamicResource ColorBrushGray4}"
-                               FontSize="12"
-                               Text="{Binding RelaySummary}" />
-                    <TextBlock TextWrapping="Wrap"
-                               Foreground="{DynamicResource ColorBrushGray4}"
-                               FontSize="12"
-                               Text="{Binding RealtimeStatusText}" />
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="10">
-                        <ui:MyButton MinWidth="120"
-                                     Height="34"
-                                     ColorType="Highlight"
-                                     Command="{Binding RefreshStatusCommand}"
-                                     IsEnabled="{Binding IsNotBusy}"
-                                     Text="刷新大厅状态" />
-                        <ui:MyButton MinWidth="120"
-                                     Height="34"
-                                     Command="{Binding GoToDreamPortAccountCommand}"
-                                     Text="管理梦港账号" />
-                    </StackPanel>
-                </StackPanel>
-            </ui:MyCard>
-
-            <!-- 2. 上次异常退出的残留房间自救卡片 -->
-            <ui:MyCard Margin="0,0,0,15"
+            <!-- 1. 上次异常退出的残留房间自救卡片 -->
+            <ui:MyCard Margin="0,15,0,15"
                        IsVisible="{Binding HasStaleRoom}"
                        Title="检测到未关闭的残留房间">
                 <StackPanel Margin="25,40,25,20"

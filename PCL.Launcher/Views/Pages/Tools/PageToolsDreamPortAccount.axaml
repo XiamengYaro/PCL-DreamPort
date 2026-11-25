@@ -14,42 +14,7 @@
                        Theme="Blue"
                        Text="{Binding StatusMessage}" />
 
-            <ui:MyCard Margin="0,15"
-                       Title="DreamPort 服务地址">
-                <StackPanel Margin="25,40,25,20"
-                            Spacing="10">
-                    <TextBlock TextWrapping="Wrap"
-                               Text="用于通过浏览器授权登录夏镇梦港站点账号、同步六步入服流程与多设备会话，并拉取服务端推送的 PCL 原生自定义主页（切换站点将先注销旧站点会话）。" />
-                    <Grid ColumnDefinitions="Auto,*,Auto"
-                          ColumnSpacing="14">
-                        <TextBlock Grid.Column="0"
-                                   VerticalAlignment="Center"
-                                   Text="站点地址" />
-                        <ui:MyTextBox Grid.Column="1"
-                                      IsEnabled="{Binding IsNotBusy}"
-                                      Text="{Binding BaseUrl, Mode=TwoWay}" />
-                        <ui:MyButton Grid.Column="2"
-                                     MinWidth="110"
-                                     Height="35"
-                                     Command="{Binding CheckServerCommand}"
-                                     IsEnabled="{Binding IsNotBusy}"
-                                     Text="检测并切换" />
-                    </Grid>
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="10">
-                        <ui:MyButton MinWidth="120"
-                                     Height="32"
-                                     Command="{Binding OpenRegisterInBrowserCommand}"
-                                     Text="前往网页注册" />
-                        <ui:MyButton MinWidth="120"
-                                     Height="32"
-                                     Command="{Binding OpenSecuritySettingsInBrowserCommand}"
-                                     Text="打开网页控制台" />
-                    </StackPanel>
-                </StackPanel>
-            </ui:MyCard>
-
-            <ui:MyCard Margin="0,0,0,15"
+            <ui:MyCard Margin="0,15,0,15"
                        IsVisible="{Binding IsNotLoggedIn}"
                        Title="通过浏览器登录 DreamPort">
                 <StackPanel Margin="25,40,25,20"

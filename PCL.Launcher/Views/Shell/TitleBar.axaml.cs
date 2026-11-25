@@ -7,6 +7,7 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using DreamPort.Core.Config;
 using PCL.Core.App;
 using PCL.Core.UI.Theme;
 using PCL.Navigation;
@@ -118,13 +119,14 @@ public partial class TitleBar : UserControl
     public void RefreshTitleAppearance()
     {
         var type = EffectiveTitleType();
-        ShapeTitleLogo.IsVisible = type == 1;
+        ShapeTitleLogo.IsVisible = false;
         ShapeHMCLTitleLogo.IsVisible = type == 4;
         BtnTitleHelp.IsVisible = type == 4;
-        LabTitleLogo.IsVisible = type == 2;
+        LabTitleLogo.IsVisible = type is 1 or 2;
         ImageTitleLogo.IsVisible = type == 3;
-        if (type != 4) CELogo.IsVisible = type != 0;
+        CELogo.IsVisible = false;
 
+        if (type == 1) LabTitleLogo.Text = DreamPortBuildConfig.RepoName;
         if (type == 2) LabTitleLogo.Text = Config.Preference.WindowTitleCustomText;
         if (type == 3)
             try

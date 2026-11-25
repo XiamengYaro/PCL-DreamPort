@@ -3702,6 +3702,7 @@
     <sys:String x:Key="Tools.Left.DreamPort">夢港</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortAccount">夢港帳號</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortCommunity">公告與通知</sys:String>
+    <sys:String x:Key="Tools.Left.DreamPortAiDiagnose">AI 排障</sys:String>
     <sys:String x:Key="Tools.Left.DreamPortSync">同步與工具</sys:String>
     <sys:String x:Key="Main.Menu.Notifications">站內通知與公告</sys:String>
 </ResourceDictionary>

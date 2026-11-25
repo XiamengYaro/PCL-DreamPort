@@ -44,6 +44,7 @@ public sealed class StartupEffects(
             UiLogBridge.Install();
             GameFolders.ApplySelectedFolder(States.Game.SelectedFolder);
             LauncherCommon.ModeDebug = Config.Debug.Enabled;
+            MigrateBrandingDefaults();
             PrepareWindowAnimation();
             ApplyLockWindowSize();
             titleBar.RefreshTitleAppearance();
@@ -61,6 +62,12 @@ public sealed class StartupEffects(
         Basics.RunInNewThread(ShowStartupDialogs, "StartupDialogs");
         _ = RunDreamPortStartupTasksAsync();
         _ = CheckDreamPortUpdatesOnStartupAsync();
+    }
+
+    private static void MigrateBrandingDefaults()
+    {
+        if (string.Equals(Config.Launch.TypeInfo, "PCLCE", StringComparison.OrdinalIgnoreCase))
+            Config.Launch.TypeInfo = DreamPortBuildConfig.RepoName;
     }
 
     private void ApplyWindowOpacity()

@@ -1,15 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
-using DreamPort.Core.Api;
-using DreamPort.Core.Auth;
-using DreamPort.Core.Diagnostics;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
-using PCL.Core.Minecraft.Profile;
-using PCL.Core.Platform;
 using PCL.Core.UI;
-using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
 using PCL.Core.ViewModel;
 using PCL.Views.Pages.Log;
@@ -23,7 +17,6 @@ public partial class PageLogRightViewModel : ViewModelBase
     private uint _errorCount;
     private uint _fatalCount;
     private uint _infoCount;
-    private bool _isAiDiagnoseRunning;
     private PageLogLeft? _left;
     private uint _warnCount;
 
@@ -40,8 +33,6 @@ public partial class PageLogRightViewModel : ViewModelBase
     public string WarnCountText => $"{_warnCount} {Lang.Text("LogPage.Level.Warn")}";
 
     [ObservableProperty] public partial bool HasLog { get; set; }
-
-    [ObservableProperty] public partial bool IsAiDiagnoseEnabled { get; set; }
 
     [ObservableProperty] public partial bool IsExportStackDumpEnabled { get; set; }
 
@@ -69,7 +60,6 @@ public partial class PageLogRightViewModel : ViewModelBase
             Lines = null;
             IsKillEnabled = false;
             IsExportStackDumpEnabled = false;
-            IsAiDiagnoseEnabled = false;
             RefreshCounters();
             return;
         }
@@ -100,14 +90,12 @@ public partial class PageLogRightViewModel : ViewModelBase
         {
             IsKillEnabled = false;
             IsExportStackDumpEnabled = false;
-            IsAiDiagnoseEnabled = false;
             return;
         }
 
         IsKillEnabled = !log.gameProcess.HasExited;
         IsExportStackDumpEnabled =
             !log.gameProcess.HasExited && !string.IsNullOrWhiteSpace(log.jStackPath);
-        IsAiDiagnoseEnabled = !_isAiDiagnoseRunning;
     }
 
     public void RefreshCounters()
@@ -242,163 +230,6 @@ public partial class PageLogRightViewModel : ViewModelBase
         }
         finally
         {
-            RefreshOperationButtons();
-        }
-    }
-
-    public async Task AiDiagnoseAsync()
-    {
-        var log = _left?.CurrentLog;
-        if (log is null || _isAiDiagnoseRunning)
-            return;
-
-        var session = new DreamPortSessionStore().Load();
-        if (string.IsNullOrWhiteSpace(session.Token))
-        {
-            HintService.Show(Hints.Warning("请先在「工具 → 梦港账号」登录后再使用 AI 日志诊断"));
-            return;
-        }
-
-        string? instDir = null;
-        try
-        {
-            instDir = log.version?.PathIndie ?? log.version?.PathInstance;
-        }
-        catch
-        {
-            instDir = log.version?.PathInstance;
-        }
-
-        var identities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(session.Username))
-            identities.Add(session.Username);
-        try
-        {
-            if (ProfileService.Current is { } cur)
-            {
-                if (!string.IsNullOrWhiteSpace(cur.UserName))
-                    identities.Add(cur.UserName);
-                if (!string.IsNullOrWhiteSpace(cur.Uuid))
-                    identities.Add(cur.Uuid);
-            }
-            foreach (var p in ProfileService.Profiles)
-            {
-                if (!string.IsNullOrWhiteSpace(p.UserName))
-                    identities.Add(p.UserName);
-                if (!string.IsNullOrWhiteSpace(p.Uuid))
-                    identities.Add(p.Uuid);
-            }
-        }
-        catch
-        {
-            // ignore
-        }
-
-        int? modCount = null;
-        if (!string.IsNullOrWhiteSpace(instDir))
-        {
-            var modsDir = Path.Combine(instDir, "mods");
-            if (Directory.Exists(modsDir))
-            {
-                try
-                {
-                    modCount = Directory.EnumerateFiles(modsDir, "*.jar", SearchOption.TopDirectoryOnly).Count();
-                }
-                catch
-                {
-                    modCount = null;
-                }
-            }
-        }
-
-        string? exitCode = null;
-        try
-        {
-            if (log.gameProcess.HasExited)
-                exitCode = log.gameProcess.ExitCode.ToString(CultureInfo.InvariantCulture);
-        }
-        catch
-        {
-            exitCode = null;
-        }
-
-        var runtimeLines = log.fullLog.ToArray();
-        var info = log.version?.Info;
-        var loader = info switch
-        {
-            null => null,
-            { HasCleanroom: true } => "cleanroom",
-            { HasNeoForge: true } => "neoforge",
-            { HasForge: true } => "forge",
-            { HasFabric: true } => "fabric",
-            { HasQuilt: true } => "quilt",
-            { HasLegacyFabric: true } => "legacyfabric",
-            { HasLiteLoader: true } => "liteloader",
-            { HasLabyMod: true } => "labymod",
-            { HasOptiFine: true } => "optifine",
-            _ => "vanilla"
-        };
-
-        var payload = DreamPortLogDiagnoseService.BuildPayload(new DreamPortLogDiagnoseBuildInput(
-            InstanceDir: instDir,
-            InstanceName: log.version?.Name ?? "未命名实例",
-            GameVersion: info?.VanillaName,
-            Loader: loader,
-            ModCount: modCount,
-            ExitCode: exitCode,
-            RuntimeLines: runtimeLines,
-            ExtraIdentities: [.. identities]));
-
-        var confirm = await DialogService.Instance.ShowAsync(
-            new TextDialogRequest
-            {
-                Title = "确认发起 AI 游戏日志诊断",
-                Content = $"即将向 DreamPort AI 发送已脱敏的日志片段（{payload.CharCount} 字符，{(payload.Truncated ? "已按预算裁剪" : "完整片段")}）。\n"
-                          + "发送前已自动隐去玩家名、用户目录路径及各类访问令牌，仅携带实例版本、加载器与模组数量。",
-                Buttons = DialogButtons.From(
-                    DialogButton.Create("开始 AI 诊断"),
-                    DialogButton.Create("取消"))
-            });
-        if (confirm.Button != 1)
-            return;
-
-        _isAiDiagnoseRunning = true;
-        RefreshOperationButtons();
-        HintService.Show(Hints.Info("正在提交脱敏日志并等待 AI 分析，请稍候..."));
-
-        try
-        {
-            using var api = new DreamPortApiClient(session.BaseUrl);
-            api.SetToken(session.Token);
-            var res = await DreamPortLogDiagnoseService.RunAsync(api, payload);
-            if (!res.Ok)
-            {
-                HintService.Show(Hints.Warning(res.Error ?? res.DisplayText));
-                return;
-            }
-
-            var dialogChoice = await DialogService.Instance.ShowAsync(
-                new TextDialogRequest
-                {
-                    Title = "DreamPort AI 日志诊断结果",
-                    Content = res.DisplayText,
-                    Buttons = DialogButtons.From(
-                        DialogButton.Create("复制诊断结果"),
-                        DialogButton.Create("关闭"))
-                });
-            if (dialogChoice.Button == 1 && ApplicationRuntime.GetService<IClipboardService>() is { } clipboard)
-            {
-                await clipboard.SetTextAsync(res.DisplayText);
-                HintService.Show(Hints.Success("已复制 AI 诊断结果", false));
-            }
-        }
-        catch (Exception ex)
-        {
-            LauncherCommon.Log(ex, "AI 日志诊断失败", LauncherLogLevel.Feedback, userSummary: ex.Message);
-        }
-        finally
-        {
-            _isAiDiagnoseRunning = false;
             RefreshOperationButtons();
         }
     }

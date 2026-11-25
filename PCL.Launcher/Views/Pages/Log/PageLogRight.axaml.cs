@@ -35,7 +35,6 @@ public partial class PageLogRight : MyPageRight, IRefreshable
         };
         BtnOperationKill.Click += (_, _) => ViewModel.KillProcess();
         BtnOperationExportStackDump.Click += (_, _) => _ = ViewModel.ExportStackDumpAsync();
-        BtnOperationAiDiagnose.Click += (_, _) => _ = ViewModel.AiDiagnoseAsync();
         SliderMaxLog.Change += (_, _) => ViewModel.MaxLogLines = SliderMaxLog.Value;
         SliderMaxLog.getHintText = PageLogRightViewModel.GetMaxLogHintText;
         ViewModel.PropertyChanged += (_, args) =>

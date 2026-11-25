@@ -46,11 +46,19 @@ public sealed class ToolsPageModule : IPageModule
             (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortCommunity>(sp)),
         Sub(
             PageIds.Tools,
+            SubPageIds.ToolsDreamPortAiDiagnose,
+            "Tools.Left.DreamPortAiDiagnose",
+            "lucide/sparkles",
+            "dreamport",
+            4,
+            (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortAiDiagnose>(sp)),
+        Sub(
+            PageIds.Tools,
             SubPageIds.ToolsDreamPortSync,
             "Tools.Left.DreamPortSync",
             "lucide/package",
             "dreamport",
-            4,
+            5,
             (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortSync>(sp))
     ];
 

@@ -6,7 +6,7 @@ namespace PCL;
 /// <summary>
 /// 梦港「同步与工具」页面视图模型：绑定当前选中的 Minecraft 实例、PCL 全局白名单配置与正版玩家身份脱敏列表。
 /// </summary>
-public sealed class PageToolsDreamPortSyncViewModel : DreamPortSyncViewModel
+public class PageToolsDreamPortSyncViewModel : DreamPortSyncViewModel
 {
     public PageToolsDreamPortSyncViewModel()
         : base(
