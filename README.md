@@ -50,8 +50,10 @@ dotnet build "PCL Community Edition.slnx" -c Release
 dotnet test DreamPort.Test/DreamPort.Test.csproj -c Debug
 dotnet test PCL.Core.Test/PCL.Core.Test.csproj -c Debug
 
-# 打包 macOS 轻量 .app（需传入实际版本号，本地可加 PCL_SKIP_CODESIGN=1）
-PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.0-poc dist
+# 打包与跨平台轻量发布（--no-self-contained，CI 发布工作流会自动生成 SHA256SUMS 供自动更新器校验）
+PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.0-rc.1 dist
+bash scripts/publish.sh win-x64 Release dist
+bash scripts/publish.sh linux-x64 Release dist
 ```
 
 | 环境变量 / 构建参数 | 默认值 | 说明 |

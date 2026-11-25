@@ -108,6 +108,20 @@ jobs:
           path: ./release
           merge-multiple: true
 
+      - name: Generate SHA256SUMS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release
+          shopt -s nullglob
+          files=(*.zip *.dmg *.AppImage *.deb *.rpm)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no release archives found for SHA256SUMS" >&2
+            exit 1
+          fi
+          sha256sum "${files[@]}" > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Sign release archives
         uses: sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9 # v3.5.0
         with:
