@@ -58,6 +58,7 @@ jobs:
       platform: ${{ matrix.platform }}
       runner: ${{ matrix.runner }}
       version: ${{ inputs.version }}
+      ref: v${{ inputs.version }}
       include_secrets: true
     secrets: inherit
 
@@ -68,6 +69,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          ref: v${{ inputs.version }}
 
       - name: Install git-cliff
         uses: taiki-e/install-action@e407f7bafb71fd004bc5c2da3032e5470cbb6ef0 # v2.87.24
@@ -132,7 +134,7 @@ jobs:
             release/*.deb
             release/*.rpm
           verify: true
-          verify-cert-identity: https://github.com/${{ github.repository }}/.github/workflows/release-publish.yml@refs/heads/dev
+          verify-cert-identity: https://github.com/${{ github.repository }}/.github/workflows/release-publish.yml@${{ github.ref }}
           verify-oidc-issuer: https://token.actions.githubusercontent.com
 
       - name: Upload archives and signatures to Release
