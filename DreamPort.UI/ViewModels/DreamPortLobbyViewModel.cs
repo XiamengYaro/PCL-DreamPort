@@ -337,7 +337,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
             else if (HasStaleRoom)
                 SetStatus($"检测到未关闭的旧房间。房码：{StaleRoomCode}。请先关闭残留旧房后再开新房。", DreamPortHintLevel.Warning);
             else if (cfg is { Enabled: true })
-                SetStatus($"✓ 梦港联机中继已就绪。地址：{cfg.RelayHost}:{cfg.RelayPort}", DreamPortHintLevel.Info);
+                SetStatus("✓ 梦港联机中继已就绪。", DreamPortHintLevel.Info);
         }
         finally
         {
