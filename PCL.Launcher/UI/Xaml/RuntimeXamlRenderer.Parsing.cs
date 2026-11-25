@@ -141,6 +141,15 @@ public static partial class RuntimeXamlRenderer
             return uniform is null ? null : new Thickness(uniform.Value);
         }
 
+        if (parts.Length == 2)
+        {
+            // WPF/Avalonia 双值写法：水平, 垂直（例如 Padding="13,6"）
+            if (ParseDouble(parts[0]) is not { } horizontal
+                || ParseDouble(parts[1]) is not { } vertical)
+                return null;
+            return new Thickness(horizontal, vertical);
+        }
+
         if (parts.Length != 4)
             return null;
         if (ParseDouble(parts[0]) is not { } left
