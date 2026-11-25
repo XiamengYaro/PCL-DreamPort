@@ -65,6 +65,17 @@ jobs:
         with:
           dotnet-version: 11.0.x
 
+      - name: Validate required release secrets
+        if: inputs.include_secrets
+        shell: bash
+        env:
+          PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+        run: |
+          test -n "$PCL_MS_CLIENT_ID" || {
+            echo "CLIENT_ID secret is required for release builds" >&2
+            exit 1
+          }
+
       - name: Publish
         shell: bash
         env:
@@ -78,11 +89,25 @@ jobs:
           APPLE_TEAM_ID: ${{ inputs.include_secrets && runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.include_secrets && runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
         run: |
-          if [ "${{ runner.os }}" = "macOS" ]; then
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            scripts/publish-windows.sh "$RID" "$CONFIGURATION" dist
+          elif [ "${{ runner.os }}" = "macOS" ]; then
             scripts/package-macos.sh "$RID" "$CONFIGURATION" "$VERSION" dist
           else
             scripts/publish.sh "$RID" "$CONFIGURATION" dist
           fi
+
+      - name: Verify Windows client ID
+        if: runner.os == 'Windows' && inputs.include_secrets
+        shell: pwsh
+        env:
+          PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+        run: |
+          $exe = Join-Path (Join-Path "dist" $env:RID) "PCL.Launcher.exe"
+          $text = [Text.Encoding]::Unicode.GetString([IO.File]::ReadAllBytes($exe))
+          if (-not $text.Contains($env:PCL_MS_CLIENT_ID)) {
+            throw "CLIENT_ID was not embedded in $exe"
+          }
 
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
@@ -107,9 +132,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $source = Join-Path (Join-Path "dist" $env:RID) "*"
-          $destination = Join-Path "dist" "$env:ASSET_NAME.zip"
-          Compress-Archive -Path $source -DestinationPath $destination -Force
+          $source = Join-Path (Join-Path "dist" $env:RID) "PCL.Launcher.exe"
+          $destination = Join-Path "dist" "$env:ASSET_NAME.exe"
+          Copy-Item -Path $source -Destination $destination -Force
 
       - name: Package Linux
         if: runner.os == 'Linux'
@@ -135,6 +160,7 @@ jobs:
         with:
           name: PCL_DreamPort_${{ inputs.configuration }}_${{ inputs.target }}
           path: |
+            dist/*.exe
             dist/*.zip
             dist/*.dmg
             dist/*.AppImage

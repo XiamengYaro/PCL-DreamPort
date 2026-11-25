@@ -128,6 +128,7 @@ jobs:
         uses: sigstore/gh-action-sigstore-python@790bc6befb9d733738f18d8f895854b453640ec9 # v3.5.0
         with:
           inputs: |
+            release/*.exe
             release/*.zip
             release/*.dmg
             release/*.AppImage

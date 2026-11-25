@@ -63,10 +63,12 @@ dotnet test DreamPort.Test/DreamPort.Test.csproj -c Debug
 dotnet test PCL.Core.Test/PCL.Core.Test.csproj -c Debug
 
 # 打包与跨平台轻量发布（--no-self-contained，CI 发布工作流会自动生成 SHA256SUMS 供自动更新器校验）
-PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.0-rc.1 dist
-bash scripts/publish.sh win-x64 Release dist
+PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.2 dist
+bash scripts/publish-windows.sh win-x64 Release dist
 bash scripts/publish.sh linux-x64 Release dist
 ```
+
+Windows 发布物为单文件 `PCL.Launcher.exe`，发布流程会将其重命名为带版本和架构的 `.exe`。
 
 | 环境变量 / 构建参数 | 默认值 | 说明 |
 |---|---|---|
