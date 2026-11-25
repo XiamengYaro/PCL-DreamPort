@@ -305,3 +305,134 @@ public sealed record DreamPortHeartbeatResult(
     int NextIntervalSec,
     DreamPortFailureReason? FailureReason = null,
     string? Message = null);
+
+public sealed record DreamPortCloudSaveItem(
+    long Id,
+    string InstanceName,
+    string WorldName,
+    string DisplayName,
+    string GameVersion,
+    long SizeBytes,
+    string Sha256,
+    int ChunkSize,
+    int ChunksTotal,
+    string Status,
+    string Note,
+    long CreatedAtMs,
+    long UpdatedAtMs,
+    long? CompletedAtMs,
+    long? ExpiresAtMs);
+
+public sealed record DreamPortCloudSaveListResult(
+    bool Ok,
+    IReadOnlyList<DreamPortCloudSaveItem> Items,
+    long UsedBytes,
+    long QuotaBytes,
+    long MaxBackupBytes,
+    int ChunkBytes,
+    int RetentionDays,
+    int MaxBackupsPerUser,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortCloudSaveBeginResult(
+    bool Ok,
+    long Id,
+    int ChunkSize,
+    int ChunksTotal,
+    IReadOnlyList<int> UploadedChunks,
+    bool Duplicate,
+    string Status,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortCloudSaveOpResult(
+    bool Ok,
+    DreamPortCloudSaveItem? Item = null,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortProfileSyncState(
+    bool Ok,
+    bool Enabled,
+    long Revision,
+    string? PayloadJson,
+    string? ClientVersion,
+    long? UpdatedAtMs,
+    int MaxBytes,
+    bool IsConflict = false,
+    DreamPortProfileSyncState? ConflictCurrent = null,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortLogDiagnoseStatusResult(
+    bool Ok,
+    bool Enabled,
+    int DailyPerUser,
+    int TimeoutHintMs,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortLogDiagnoseSubmitResult(
+    bool Ok,
+    bool Accepted,
+    string? JobId,
+    int PollAfterMs,
+    string? Error = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortLogDiagnoseItem(
+    string Title,
+    string Evidence,
+    string Advice,
+    double Confidence);
+
+public sealed record DreamPortLogDiagnoseVerdict(
+    string Verdict,
+    string Summary,
+    IReadOnlyList<DreamPortLogDiagnoseItem> Items,
+    IReadOnlyList<string> AskFor);
+
+public sealed record DreamPortLogDiagnosePollResult(
+    bool Ok,
+    bool Found,
+    string Status,
+    DreamPortLogDiagnoseVerdict? Result = null,
+    string? Failure = null,
+    string? Reason = null,
+    int TotalTokens = 0,
+    long LatencyMs = 0,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortResourceTranslateItem(
+    string Id,
+    string Title,
+    string Summary);
+
+public sealed record DreamPortResourceTranslatedItem(
+    string TitleZh,
+    string SummaryZh);
+
+public sealed record DreamPortResourceTranslateResult(
+    bool Ok,
+    IReadOnlyDictionary<string, DreamPortResourceTranslatedItem> Translations,
+    int CacheHits,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortResourceExplainRequest(
+    string Kind,
+    string Name,
+    string Summary,
+    string Description,
+    IReadOnlyList<string> Categories,
+    IReadOnlyList<string> Mods);
+
+public sealed record DreamPortResourceExplainResult(
+    bool Ok,
+    string Overview,
+    IReadOnlyList<string> Features,
+    IReadOnlyList<string> Notes,
+    bool Cached,
+    string? Message = null,
+    DreamPortFailureReason? FailureReason = null);

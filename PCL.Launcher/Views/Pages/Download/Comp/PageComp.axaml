@@ -76,6 +76,10 @@
                                                  LogoScale="0.9"
                                                  Margin="3,0,0,0"
                                                  SvgIcon="lucide/rotate-ccw" />
+                                <ui:MyIconButton x:Name="BtnAiTranslatePage"
+                                                 LogoScale="0.9"
+                                                 Margin="3,0,0,0"
+                                                 SvgIcon="lucide/earth" />
                                 <ui:MyIconButton x:Name="BtnSearchInstallModPack"
                                                  LogoScale="0.9"
                                                  SvgIcon="lucide/download"

@@ -47,6 +47,12 @@
                                                  SvgIcon="lucide/earth"
                                                  IsVisible="False"
                                                  Text="{loc:Loc Download.Comp.Detail.TranslateDescription}" />
+                            <ui:MyIconTextButton x:Name="BtnAiExplain"
+                                                 Margin="0,0,3,0"
+                                                 BorderBrush="{DynamicResource ColorBrush6}"
+                                                 BorderThickness="1"
+                                                 SvgIcon="lucide/sparkles"
+                                                 Text="AI 功能解析" />
                             <ui:MyIconTextButton x:Name="BtnFavorites"
                                                  Margin="0,0,2,0"
                                                  BorderBrush="{DynamicResource ColorBrush6}"

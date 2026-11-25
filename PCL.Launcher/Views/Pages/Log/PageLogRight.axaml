@@ -60,6 +60,11 @@
                                          SvgIcon="lucide/package"
                                          IsEnabled="{Binding IsExportStackDumpEnabled}"
                                          Text="{loc:Loc LogPage.Action.ExportStack}" />
+                    <ui:MyIconTextButton x:Name="BtnOperationAiDiagnose"
+                                         LogoScale="0.9"
+                                         SvgIcon="lucide/sparkles"
+                                         IsEnabled="{Binding IsAiDiagnoseEnabled}"
+                                         Text="AI 诊断" />
                 </StackPanel>
                 <Grid VerticalAlignment="Center"
                       Margin="12,0,12,4">

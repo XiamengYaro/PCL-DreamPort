@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using DreamPort.Core.Config;
 using DreamPort.Core.Lobby;
@@ -1817,6 +1819,646 @@ public sealed partial class DreamPortApiClient : IDisposable
             ct: ct).ConfigureAwait(false);
 
         return !TryClassifyFailure(res, "下线通知失败", out _, out _);
+    }
+
+    public async Task<DreamPortCloudSaveListResult> GetCloudSaveListAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortCloudSaveListResult(false, [], 0, 0, 0, 16 * 1024 * 1024, 365, 10, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Get, "/api/client/save-backups", auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "读取云存档列表失败", out var reason, out var error))
+            return new DreamPortCloudSaveListResult(false, [], 0, 0, 0, 16 * 1024 * 1024, 365, 10, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var items = new List<DreamPortCloudSaveItem>();
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("items", out var itemsEl)
+            && itemsEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var row in itemsEl.EnumerateArray())
+            {
+                if (ParseCloudSaveItem(row) is { } parsed)
+                    items.Add(parsed);
+            }
+        }
+
+        return new DreamPortCloudSaveListResult(
+            Ok: true,
+            Items: items,
+            UsedBytes: GetLong(data, "usedBytes") ?? 0,
+            QuotaBytes: GetLong(data, "quotaBytes") ?? 0,
+            MaxBackupBytes: GetLong(data, "maxBackupBytes") ?? 0,
+            ChunkBytes: GetInt(data, "chunkBytes") ?? (16 * 1024 * 1024),
+            RetentionDays: GetInt(data, "retentionDays") ?? 365,
+            MaxBackupsPerUser: GetInt(data, "maxBackupsPerUser") ?? 10);
+    }
+
+    public async Task<DreamPortCloudSaveOpResult> GetCloudSaveMetaAsync(long id, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortCloudSaveOpResult(false, null, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Get, $"/api/client/save-backups/{id}", auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取云备份详情失败", out var reason, out var error))
+            return new DreamPortCloudSaveOpResult(false, null, error, reason);
+
+        var item = ParseCloudSaveItem(UnwrapData(res.Body));
+        return item is null
+            ? new DreamPortCloudSaveOpResult(false, null, "云备份数据格式无效")
+            : new DreamPortCloudSaveOpResult(true, item);
+    }
+
+    public async Task<DreamPortCloudSaveBeginResult> BeginCloudSaveUploadAsync(
+        string instanceName,
+        string worldName,
+        string displayName,
+        string gameVersion,
+        long sizeBytes,
+        string sha256,
+        string? note = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortCloudSaveBeginResult(false, 0, 0, 0, [], false, "", "未登录", DreamPortFailureReason.Expired);
+
+        var body = new
+        {
+            instanceName,
+            worldName,
+            displayName,
+            gameVersion,
+            sizeBytes,
+            sha256,
+            note = string.IsNullOrWhiteSpace(note) ? null : note.Trim()
+        };
+
+        var res = await SendAsync(HttpMethod.Post, "/api/client/save-backups/begin", body, auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "创建云备份任务失败", out var reason, out var error))
+            return new DreamPortCloudSaveBeginResult(false, 0, 0, 0, [], false, "", error, reason);
+
+        var data = UnwrapData(res.Body);
+        var uploaded = new List<int>();
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("uploadedChunks", out var arr)
+            && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var el in arr.EnumerateArray())
+            {
+                if (el.ValueKind == JsonValueKind.Number && el.TryGetInt32(out var idx) && idx >= 0)
+                    uploaded.Add(idx);
+            }
+        }
+
+        return new DreamPortCloudSaveBeginResult(
+            Ok: true,
+            Id: GetLong(data, "id") ?? 0,
+            ChunkSize: GetInt(data, "chunkSize") ?? (16 * 1024 * 1024),
+            ChunksTotal: GetInt(data, "chunksTotal") ?? 0,
+            UploadedChunks: uploaded,
+            Duplicate: GetBool(data, "duplicate"),
+            Status: GetString(data, "status") ?? "uploading",
+            Message: ExtractMessage(res.Body, "云备份任务已创建"));
+    }
+
+    public async Task<DreamPortApiActionResult> UploadCloudSaveChunkAsync(
+        long id,
+        int chunkIndex,
+        byte[] data,
+        int offset,
+        int count,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortApiActionResult(false, "未登录", DreamPortFailureReason.Expired);
+
+        var effectiveTimeout = TimeSpan.FromSeconds(60);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(effectiveTimeout);
+
+        using var req = CreateRequest(HttpMethod.Post, $"/api/client/save-backups/{id}/chunks/{chunkIndex}", accept: "application/json", auth: true);
+        using var multipart = new MultipartFormDataContent();
+        using var content = new ByteArrayContent(data, offset, count);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        multipart.Add(content, "file", $"chunk-{chunkIndex:D5}.part");
+        req.Content = multipart;
+
+        ApiResponse parsedRes;
+        try
+        {
+            using var resp = await _http.SendAsync(req, timeoutCts.Token).ConfigureAwait(false);
+            var raw = await resp.Content.ReadAsStringAsync(timeoutCts.Token).ConfigureAwait(false);
+            parsedRes = new ApiResponse((int)resp.StatusCode, TryParseJson(raw), raw, null);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            parsedRes = new ApiResponse(0, null, null, "分块上传超时（60 秒）");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            parsedRes = new ApiResponse(0, null, null, ex.Message);
+        }
+
+        return ToActionResult(parsedRes, "分块已上传", $"第 {chunkIndex + 1} 个分块上传失败");
+    }
+
+    public async Task<DreamPortCloudSaveOpResult> CompleteCloudSaveUploadAsync(long id, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortCloudSaveOpResult(false, null, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            $"/api/client/save-backups/{id}/complete",
+            new { },
+            auth: true,
+            timeout: TimeSpan.FromSeconds(120),
+            ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "完成云备份校验失败", out var reason, out var error))
+            return new DreamPortCloudSaveOpResult(false, null, error, reason);
+
+        return new DreamPortCloudSaveOpResult(true, ParseCloudSaveItem(UnwrapData(res.Body)), ExtractMessage(res.Body, "云备份已完成并校验"));
+    }
+
+    public async Task<DreamPortCloudSaveOpResult> RenameCloudSaveAsync(long id, string displayName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortCloudSaveOpResult(false, null, "未登录", DreamPortFailureReason.Expired);
+
+        var cleanName = (displayName ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(cleanName))
+            return new DreamPortCloudSaveOpResult(false, null, "备份名称不能为空");
+
+        var res = await SendAsync(HttpMethod.Put, $"/api/client/save-backups/{id}", new { displayName = cleanName }, auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "重命名云备份失败", out var reason, out var error))
+            return new DreamPortCloudSaveOpResult(false, null, error, reason);
+
+        return new DreamPortCloudSaveOpResult(true, ParseCloudSaveItem(UnwrapData(res.Body)), ExtractMessage(res.Body, "云备份已重命名"));
+    }
+
+    public async Task<(bool Ok, string? Sha256, string? Error, DreamPortFailureReason? FailureReason)> DownloadCloudSaveToFileAsync(
+        long id,
+        string destinationPath,
+        string? expectedSha256 = null,
+        Action<long, long>? onProgress = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return (false, null, "未登录", DreamPortFailureReason.Expired);
+
+        var dir = Path.GetDirectoryName(destinationPath);
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
+
+        var partPath = destinationPath + ".dp-save-part";
+        try
+        {
+            using var req = CreateRequest(HttpMethod.Get, $"/api/client/save-backups/{id}/file", accept: "*/*", auth: true);
+            using var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            if ((int)resp.StatusCode == 401)
+                return (false, null, "登录已过期，请重新登录", DreamPortFailureReason.Expired);
+            if (!resp.IsSuccessStatusCode)
+                return (false, null, $"下载云存档失败（HTTP {(int)resp.StatusCode}）", null);
+
+            string? headerSha = null;
+            if (resp.Headers.TryGetValues("X-Content-SHA256", out var headerVals))
+                headerSha = headerVals.FirstOrDefault()?.Trim();
+
+            var totalBytes = resp.Content.Headers.ContentLength ?? -1L;
+            long downloadedBytes = 0;
+
+            using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            await using (var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false))
+            await using (var dst = new FileStream(partPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+            {
+                var buffer = new byte[81920];
+                int read;
+                while ((read = await src.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
+                {
+                    await dst.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+                    sha.AppendData(buffer, 0, read);
+                    downloadedBytes += read;
+                    onProgress?.Invoke(downloadedBytes, totalBytes);
+                }
+            }
+
+            var actualSha = Convert.ToHexStringLower(sha.GetHashAndReset());
+            if (!string.IsNullOrWhiteSpace(expectedSha256)
+                && !string.Equals(actualSha, expectedSha256.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, null, $"云存档下载 SHA-256 校验失败（期望 {expectedSha256}，实际 {actualSha}）", null);
+            }
+
+            if (!string.IsNullOrWhiteSpace(headerSha)
+                && !string.Equals(actualSha, headerSha, StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, null, $"云存档响应头 SHA-256 校验失败（响应头 {headerSha}，实际 {actualSha}）", null);
+            }
+
+            File.Move(partPath, destinationPath, overwrite: true);
+            return (true, actualSha, null, null);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return (false, null, "已取消下载云存档", null);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException)
+        {
+            return (false, null, $"{ex.Message}，请检查服务地址与网络", DreamPortFailureReason.Network);
+        }
+        catch (Exception ex)
+        {
+            return (false, null, ex.Message, null);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(partPath))
+                    File.Delete(partPath);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+    }
+
+    public async Task<DreamPortApiActionResult> DeleteCloudSaveAsync(long id, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortApiActionResult(false, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Delete, $"/api/client/save-backups/{id}", auth: true, ct: ct).ConfigureAwait(false);
+        return ToActionResult(res, "云备份已删除", "删除云备份失败");
+    }
+
+    public async Task<DreamPortProfileSyncState> GetProfileSyncAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortProfileSyncState(false, false, 0, null, null, null, 256 * 1024, false, null, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Get, "/api/client/profile-sync", auth: true, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "读取云端配置失败", out var reason, out var error))
+            return new DreamPortProfileSyncState(false, false, 0, null, null, null, 256 * 1024, false, null, error, reason);
+
+        return ParseProfileSyncState(UnwrapData(res.Body), ExtractMessage(res.Body, "已获取云端配置"));
+    }
+
+    public async Task<DreamPortProfileSyncState> PutProfileSyncAsync(long baseRevision, JsonNode payload, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortProfileSyncState(false, false, 0, null, null, null, 256 * 1024, false, null, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(
+            HttpMethod.Put,
+            "/api/client/profile-sync",
+            new { baseRevision, payload },
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+
+        if (res.Status == 409)
+        {
+            var current = ParseProfileSyncState(UnwrapData(res.Body), ExtractMessage(res.Body, "配置已被另一台设备更新"));
+            return new DreamPortProfileSyncState(
+                Ok: false,
+                Enabled: current.Enabled,
+                Revision: current.Revision,
+                PayloadJson: current.PayloadJson,
+                ClientVersion: current.ClientVersion,
+                UpdatedAtMs: current.UpdatedAtMs,
+                MaxBytes: current.MaxBytes,
+                IsConflict: true,
+                ConflictCurrent: current,
+                Message: ExtractMessage(res.Body, "云端配置已被另一台设备更新"));
+        }
+
+        if (TryClassifyFailure(res, "同步本机配置失败", out var reason, out var error))
+            return new DreamPortProfileSyncState(false, false, 0, null, null, null, 256 * 1024, false, null, error, reason);
+
+        return ParseProfileSyncState(UnwrapData(res.Body), ExtractMessage(res.Body, "配置已同步"));
+    }
+
+    public async Task<DreamPortApiActionResult> ResetProfileSyncAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortApiActionResult(false, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(HttpMethod.Delete, "/api/client/profile-sync", auth: true, ct: ct).ConfigureAwait(false);
+        return ToActionResult(res, "云端配置已清除", "清除云端配置失败");
+    }
+
+    public async Task<DreamPortLogDiagnoseStatusResult> GetLogDiagnoseStatusAsync(CancellationToken ct = default)
+    {
+        var res = await SendAsync(HttpMethod.Get, "/api/ai/log-diagnose/status", auth: false, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取 AI 日志诊断状态失败", out var reason, out var error))
+            return new DreamPortLogDiagnoseStatusResult(false, false, 0, 90000, error, reason);
+
+        var data = UnwrapData(res.Body);
+        return new DreamPortLogDiagnoseStatusResult(
+            Ok: true,
+            Enabled: GetBool(data, "enabled"),
+            DailyPerUser: GetInt(data, "dailyPerUser") ?? 0,
+            TimeoutHintMs: GetInt(data, "timeoutHintMs") ?? 90000);
+    }
+
+    public async Task<DreamPortLogDiagnoseSubmitResult> SubmitLogDiagnoseAsync(
+        string content,
+        string context,
+        string exitCode,
+        bool truncated,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortLogDiagnoseSubmitResult(false, false, null, 2500, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            "/api/ai/log-diagnose",
+            new
+            {
+                content = content ?? string.Empty,
+                context = context ?? string.Empty,
+                exitCode = exitCode ?? string.Empty,
+                truncated
+            },
+            auth: true,
+            timeout: TimeSpan.FromSeconds(25),
+            ct: ct).ConfigureAwait(false);
+
+        if (TryClassifyFailure(res, "提交 AI 日志诊断失败", out var reason, out var error))
+            return new DreamPortLogDiagnoseSubmitResult(false, false, null, 2500, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var accepted = GetBool(data, "accepted");
+        var jobId = GetString(data, "jobId");
+        var pollAfterMs = Math.Clamp(GetInt(data, "pollAfterMs") ?? 2500, 1000, 10000);
+        var bizError = GetString(data, "error");
+        return new DreamPortLogDiagnoseSubmitResult(true, accepted, jobId, pollAfterMs, bizError);
+    }
+
+    public async Task<DreamPortLogDiagnosePollResult> PollLogDiagnoseResultAsync(string jobId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortLogDiagnosePollResult(false, false, "failed", Failure: "未登录", FailureReason: DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(
+            HttpMethod.Get,
+            $"/api/ai/log-diagnose/result?jobId={Uri.EscapeDataString(jobId)}",
+            auth: true,
+            ct: ct).ConfigureAwait(false);
+
+        if (TryClassifyFailure(res, "查询 AI 日志诊断结果失败", out var reason, out var error))
+            return new DreamPortLogDiagnosePollResult(false, false, "failed", Failure: error, FailureReason: reason);
+
+        var data = UnwrapData(res.Body);
+        var found = GetBool(data, "found");
+        var status = (GetString(data, "status") ?? (found ? "running" : "missing")).Trim().ToLowerInvariant();
+        if (!found)
+        {
+            return new DreamPortLogDiagnosePollResult(
+                Ok: true,
+                Found: false,
+                Status: "missing",
+                Reason: GetString(data, "reason") ?? "任务不存在或结果已被取走");
+        }
+
+        DreamPortLogDiagnoseVerdict? verdict = null;
+        if (status == "done"
+            && data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("result", out var resultEl)
+            && resultEl.ValueKind == JsonValueKind.Object)
+        {
+            var items = new List<DreamPortLogDiagnoseItem>();
+            if (resultEl.TryGetProperty("items", out var itemsArr) && itemsArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var it in itemsArr.EnumerateArray())
+                {
+                    if (it.ValueKind != JsonValueKind.Object)
+                        continue;
+                    var title = GetString(it, "title")?.Trim() ?? string.Empty;
+                    var advice = GetString(it, "advice")?.Trim() ?? string.Empty;
+                    if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(advice))
+                        continue;
+                    var confidence = it.TryGetProperty("confidence", out var confEl) && confEl.ValueKind == JsonValueKind.Number
+                        ? confEl.GetDouble()
+                        : 0d;
+                    items.Add(new DreamPortLogDiagnoseItem(
+                        Title: title,
+                        Evidence: GetString(it, "evidence")?.Trim() ?? string.Empty,
+                        Advice: advice,
+                        Confidence: confidence));
+                }
+            }
+
+            var askFor = new List<string>();
+            if (resultEl.TryGetProperty("askFor", out var askArr) && askArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var a in askArr.EnumerateArray())
+                {
+                    var text = a.ValueKind == JsonValueKind.String ? a.GetString()?.Trim() : null;
+                    if (!string.IsNullOrEmpty(text))
+                        askFor.Add(text);
+                }
+            }
+
+            verdict = new DreamPortLogDiagnoseVerdict(
+                Verdict: GetString(resultEl, "verdict")?.Trim() ?? "insufficient",
+                Summary: GetString(resultEl, "summary")?.Trim() ?? string.Empty,
+                Items: items,
+                AskFor: askFor);
+        }
+
+        var totalTokens = 0;
+        var latencyMs = 0L;
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("usage", out var usageEl)
+            && usageEl.ValueKind == JsonValueKind.Object)
+        {
+            totalTokens = GetInt(usageEl, "totalTokens") ?? 0;
+            latencyMs = GetLong(usageEl, "latencyMs") ?? 0;
+        }
+
+        return new DreamPortLogDiagnosePollResult(
+            Ok: true,
+            Found: true,
+            Status: status,
+            Result: verdict,
+            Failure: GetString(data, "failure"),
+            TotalTokens: totalTokens,
+            LatencyMs: latencyMs);
+    }
+
+    public async Task<(bool Ok, bool Available, string? Message)> GetResourceAiStatusAsync(CancellationToken ct = default)
+    {
+        var res = await SendAsync(HttpMethod.Get, "/api/ai/resource/status", auth: false, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取资源 AI 服务状态失败", out _, out var error))
+            return (false, false, error);
+
+        var data = UnwrapData(res.Body);
+        return (true, GetBool(data, "available"), null);
+    }
+
+    public async Task<DreamPortResourceTranslateResult> TranslateResourcePageAsync(
+        IReadOnlyList<DreamPortResourceTranslateItem> items,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortResourceTranslateResult(false, new Dictionary<string, DreamPortResourceTranslatedItem>(), 0, "未登录", DreamPortFailureReason.Expired);
+
+        var batch = (items ?? [])
+            .Where(x => !string.IsNullOrWhiteSpace(x.Id))
+            .Take(30)
+            .Select(x => new
+            {
+                id = x.Id.Trim(),
+                title = x.Title ?? string.Empty,
+                summary = x.Summary ?? string.Empty
+            })
+            .ToArray();
+
+        if (batch.Length == 0)
+            return new DreamPortResourceTranslateResult(true, new Dictionary<string, DreamPortResourceTranslatedItem>(), 0);
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            "/api/ai/resource/translate",
+            new { items = batch },
+            auth: true,
+            timeout: TimeSpan.FromSeconds(35),
+            ct: ct).ConfigureAwait(false);
+
+        if (TryClassifyFailure(res, "AI 资源翻译失败", out var reason, out var error))
+            return new DreamPortResourceTranslateResult(false, new Dictionary<string, DreamPortResourceTranslatedItem>(), 0, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var map = new Dictionary<string, DreamPortResourceTranslatedItem>(StringComparer.Ordinal);
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("translations", out var transEl)
+            && transEl.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var prop in transEl.EnumerateObject())
+            {
+                if (prop.Value.ValueKind != JsonValueKind.Object)
+                    continue;
+                var titleZh = GetString(prop.Value, "titleZh")?.Trim() ?? string.Empty;
+                var summaryZh = GetString(prop.Value, "summaryZh")?.Trim() ?? string.Empty;
+                if (!string.IsNullOrEmpty(titleZh) || !string.IsNullOrEmpty(summaryZh))
+                    map[prop.Name] = new DreamPortResourceTranslatedItem(titleZh, summaryZh);
+            }
+        }
+
+        return new DreamPortResourceTranslateResult(true, map, GetInt(data, "cacheHits") ?? 0);
+    }
+
+    public async Task<DreamPortResourceExplainResult> ExplainResourceAsync(
+        DreamPortResourceExplainRequest request,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortResourceExplainResult(false, string.Empty, [], [], false, "未登录", DreamPortFailureReason.Expired);
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            "/api/ai/resource/explain",
+            new
+            {
+                kind = request.Kind,
+                name = request.Name,
+                summary = request.Summary,
+                description = request.Description,
+                categories = request.Categories,
+                mods = request.Mods
+            },
+            auth: true,
+            timeout: TimeSpan.FromSeconds(35),
+            ct: ct).ConfigureAwait(false);
+
+        if (TryClassifyFailure(res, "AI 资源功能解析失败", out var reason, out var error))
+            return new DreamPortResourceExplainResult(false, string.Empty, [], [], false, error, reason);
+
+        var data = UnwrapData(res.Body);
+        var overview = GetString(data, "overview")?.Trim() ?? string.Empty;
+        var features = ReadStringArray(data, "features");
+        var notes = ReadStringArray(data, "notes");
+        return new DreamPortResourceExplainResult(
+            Ok: !string.IsNullOrEmpty(overview) || features.Count > 0,
+            Overview: overview,
+            Features: features,
+            Notes: notes,
+            Cached: GetBool(data, "cached"));
+    }
+
+    private static DreamPortCloudSaveItem? ParseCloudSaveItem(JsonElement el)
+    {
+        if (el.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var id = GetLong(el, "id") ?? 0;
+        if (id <= 0)
+            return null;
+
+        var world = GetString(el, "worldName") ?? string.Empty;
+        var display = GetString(el, "displayName");
+        return new DreamPortCloudSaveItem(
+            Id: id,
+            InstanceName: GetString(el, "instanceName") ?? string.Empty,
+            WorldName: world,
+            DisplayName: string.IsNullOrWhiteSpace(display) ? world : display,
+            GameVersion: GetString(el, "gameVersion") ?? string.Empty,
+            SizeBytes: GetLong(el, "sizeBytes") ?? 0,
+            Sha256: GetString(el, "sha256") ?? string.Empty,
+            ChunkSize: GetInt(el, "chunkSize") ?? (16 * 1024 * 1024),
+            ChunksTotal: GetInt(el, "chunksTotal") ?? 0,
+            Status: GetString(el, "status") ?? "ready",
+            Note: GetString(el, "note") ?? string.Empty,
+            CreatedAtMs: GetLong(el, "createdAt") ?? 0,
+            UpdatedAtMs: GetLong(el, "updatedAt") ?? 0,
+            CompletedAtMs: GetLong(el, "completedAt"),
+            ExpiresAtMs: GetLong(el, "expiresAt"));
+    }
+
+    private static DreamPortProfileSyncState ParseProfileSyncState(JsonElement data, string? message)
+    {
+        string? payloadJson = null;
+        if (data.ValueKind == JsonValueKind.Object
+            && data.TryGetProperty("payload", out var payloadEl)
+            && payloadEl.ValueKind != JsonValueKind.Null
+            && payloadEl.ValueKind != JsonValueKind.Undefined)
+        {
+            payloadJson = payloadEl.GetRawText();
+        }
+
+        return new DreamPortProfileSyncState(
+            Ok: true,
+            Enabled: GetNullableBool(data, "enabled") ?? true,
+            Revision: GetLong(data, "revision") ?? 0,
+            PayloadJson: payloadJson,
+            ClientVersion: GetString(data, "clientVersion"),
+            UpdatedAtMs: GetLong(data, "updatedAt"),
+            MaxBytes: GetInt(data, "maxBytes") ?? (256 * 1024),
+            Message: message);
+    }
+
+    private static IReadOnlyList<string> ReadStringArray(JsonElement obj, string propName)
+    {
+        if (obj.ValueKind != JsonValueKind.Object
+            || !obj.TryGetProperty(propName, out var arr)
+            || arr.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var list = new List<string>();
+        foreach (var item in arr.EnumerateArray())
+        {
+            var s = item.ValueKind == JsonValueKind.String ? item.GetString()?.Trim() : item.ToString().Trim();
+            if (!string.IsNullOrEmpty(s))
+                list.Add(s);
+        }
+        return list;
     }
 
     public void Dispose()

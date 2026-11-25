@@ -4,6 +4,9 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Media;
+using DreamPort.Core.Api;
+using DreamPort.Core.Auth;
+using DreamPort.Core.Services;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.IO;
@@ -69,6 +72,7 @@ public partial class PageDownloadCompDetail : MyPageRight
             HintService.Show(Hints.Success(Lang.Text("Common.Status.Success"), false));
         };
         BtnTranslate.Click += async (_, _) => await TranslateDescriptionAsync();
+        BtnAiExplain.Click += async (_, _) => await ExplainResourceWithAiAsync();
         BtnFavorites.Click += (_, _) =>
         {
             if (ViewModel.Project is { } project)
@@ -198,7 +202,23 @@ public partial class PageDownloadCompDetail : MyPageRight
                         "Download.Comp.Detail.DescriptionTranslating",
                         project.TranslatedName)));
             var chineseDescription = await project.ChineseDescription;
-            if (chineseDescription is null) return;
+            if (string.IsNullOrWhiteSpace(chineseDescription))
+            {
+                var session = new DreamPortSessionStore().Load();
+                if (!string.IsNullOrWhiteSpace(session.Token))
+                {
+                    using var api = new DreamPortApiClient(session.BaseUrl);
+                    api.SetToken(session.Token);
+                    var aiRes = await DreamPortResourceAiHelper.Shared.TranslatePageAsync(
+                        api,
+                        [new DreamPortResourceTranslateItem(project.Id, project.RawName, project.Description)]);
+                    if (aiRes.Translations.TryGetValue(project.Id, out var tr))
+                        chineseDescription = string.IsNullOrWhiteSpace(tr.TitleZh)
+                            ? tr.SummaryZh
+                            : $"{tr.TitleZh}\n\n{tr.SummaryZh}".Trim();
+                }
+            }
+            if (string.IsNullOrWhiteSpace(chineseDescription)) return;
             await DialogService.Instance.ShowAsync(
                 new TextDialogRequest
                 {
@@ -221,6 +241,67 @@ public partial class PageDownloadCompDetail : MyPageRight
         finally
         {
             BtnTranslate.IsEnabled = true;
+        }
+    }
+
+    private async Task ExplainResourceWithAiAsync()
+    {
+        if (ViewModel.Project is not { } project)
+            return;
+
+        var session = new DreamPortSessionStore().Load();
+        if (string.IsNullOrWhiteSpace(session.Token))
+        {
+            HintService.Show(Hints.Warning("请先在「工具 → 梦港账号」登录已过审账号后再使用 AI 功能解析"));
+            return;
+        }
+
+        try
+        {
+            BtnAiExplain.IsEnabled = false;
+            HintService.Show(Hints.Info($"正在使用梦港 AI 解析「{project.TranslatedName}」的功能特性...", false));
+
+            using var api = new DreamPortApiClient(session.BaseUrl);
+            api.SetToken(session.Token);
+            var req = new DreamPortResourceExplainRequest(
+                Kind: project.Type.ToString().ToLowerInvariant(),
+                Name: project.RawName,
+                Summary: project.Description,
+                Description: project.Description,
+                Categories: project.Tags.ToArray(),
+                Mods: []);
+
+            var res = await DreamPortResourceAiHelper.Shared.ExplainAsync(api, req);
+            if (!res.Ok)
+            {
+                HintService.Show(Hints.Warning(res.Message ?? "AI 功能解析暂不可用"));
+                return;
+            }
+
+            var display = DreamPortResourceAiHelper.FormatExplainForDisplay(project.TranslatedName, res);
+            var choice = await DialogService.Instance.ShowAsync(
+                new TextDialogRequest
+                {
+                    Title = $"AI 功能解析：{project.TranslatedName}",
+                    Content = display,
+                    Buttons = DialogButtons.From(
+                        DialogButton.Create("复制解析"),
+                        DialogButton.Create("关闭"))
+                });
+
+            if (choice.Button == 1 && ApplicationRuntime.GetService<IClipboardService>() is { } clipboard)
+            {
+                await clipboard.SetTextAsync(display);
+                HintService.Show(Hints.Success("已复制 AI 功能解析结果", false));
+            }
+        }
+        catch (Exception ex)
+        {
+            LauncherCommon.Log(ex, "AI 资源解析失败", LauncherLogLevel.Feedback, userSummary: ex.Message);
+        }
+        finally
+        {
+            BtnAiExplain.IsEnabled = true;
         }
     }
 
