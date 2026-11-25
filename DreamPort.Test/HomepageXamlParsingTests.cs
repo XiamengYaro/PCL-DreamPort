@@ -45,22 +45,20 @@ public sealed class HomepageXamlParsingTests
                     </Border.Background>
                     <Grid>
                         <Border Background="#70000000" />
-                        <StackPanel Margin="24,24,72,24" VerticalAlignment="Bottom">
+                        <StackPanel Margin="24" VerticalAlignment="Bottom">
                             <TextBlock FontSize="22" FontWeight="Bold" Foreground="#FFFFFFFF"
                                        TextWrapping="Wrap" Text="港湾实景" />
                             <TextBlock Foreground="#E6FFFFFF" TextWrapping="Wrap" Text="从梦港出发" />
                         </StackPanel>
-                        <local:MyButton HorizontalAlignment="Right" VerticalAlignment="Top"
-                                        Margin="0,20,20,0" Text="刷新主页" EventType="刷新主页" />
                     </Grid>
                 </Border>
                 <local:MyCard Title="照片墙" Margin="0,0,0,15" CanSwap="True">
-                    <StackPanel Margin="25,25,23,15">
-                        <WrapPanel Orientation="Horizontal" ItemWidth="270">
+                    <StackPanel Margin="25,36,23,20">
+                        <WrapPanel Orientation="Horizontal" ItemWidth="270" Margin="0,0,0,10">
                             <StackPanel Width="260" Margin="0,0,10,10">
                                 <local:MyImage Source="https://xmcraft.cn/uploads/photo.webp"
                                                Height="132" Stretch="UniformToFill" CornerRadius="6" />
-                                <TextBlock TextWrapping="Wrap" Text="港湾日落" />
+                                <TextBlock TextWrapping="Wrap" Margin="0,10,0,0" Text="港湾日落" />
                             </StackPanel>
                         </WrapPanel>
                     </StackPanel>
@@ -84,8 +82,7 @@ public sealed class HomepageXamlParsingTests
         var heroContent = FindControls<StackPanel>(border)
             .Single(panel => panel.Children.OfType<TextBlock>().Any());
         Assert.AreEqual(2, heroContent.Children.OfType<TextBlock>().Count());
-        var refresh = FindControls<MyButton>(border).Single();
-        Assert.AreEqual("刷新主页", refresh.Text);
+        Assert.IsFalse(FindControls<MyButton>(border).Any());
 
         var card = root.Children.OfType<MyCard>().Single();
         var wrap = FindControls<WrapPanel>(card).Single();
