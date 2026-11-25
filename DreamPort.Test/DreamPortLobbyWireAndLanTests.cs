@@ -172,6 +172,52 @@ public sealed class DreamPortLobbyWireAndLanTests
     }
 
     [TestMethod]
+    public async Task LanPortDetection_LogFallbackDoesNotLeakUnobservedUdpCancellation()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var root = Path.Combine(Path.GetTempPath(), "pcl-lan-detect-" + Guid.NewGuid().ToString("N"));
+        var logs = Path.Combine(root, "logs");
+        Directory.CreateDirectory(logs);
+        await File.WriteAllTextAsync(
+            Path.Combine(logs, "latest.log"),
+            $"Published LAN server on port {port}\n");
+
+        var leaked = 0;
+        void OnUnobserved(object? _, UnobservedTaskExceptionEventArgs args)
+        {
+            if (args.Exception.Flatten().InnerExceptions.Any(ex => ex is SocketException))
+                Interlocked.Increment(ref leaked);
+            args.SetObserved();
+        }
+
+        TaskScheduler.UnobservedTaskException += OnUnobserved;
+        try
+        {
+            var result = await DreamPortLanService.DetectLanPortAsync(
+                TimeSpan.FromSeconds(4),
+                [root]);
+
+            Assert.AreEqual(port, result.Port);
+            for (var i = 0; i < 5; i++)
+            {
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+                GC.WaitForPendingFinalizers();
+                await Task.Delay(20);
+            }
+
+            Assert.AreEqual(0, Volatile.Read(ref leaked), "UDP 接收取消异常必须被观察");
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= OnUnobserved;
+            listener.Stop();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public async Task EndToEndLoopback_HostAndGuestStreamRawBytes_ReconnectsAndHandlesEventsCleanly()
     {
         await using var gameServer = new LoopbackEchoGameServer();

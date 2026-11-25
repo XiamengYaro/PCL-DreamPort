@@ -323,18 +323,20 @@ public static partial class DreamPortLanService
             }
 
             UdpReceiveResult packet;
+            using var receiveCts = CancellationTokenSource.CreateLinkedTokenSource(deadlineCts.Token);
+            Task<UdpReceiveResult>? receiveTask = null;
             try
             {
-                var receiveTask = udp.ReceiveAsync(deadlineCts.Token).AsTask();
+                receiveTask = udp.ReceiveAsync(receiveCts.Token).AsTask();
                 if (!fallbackChecked && candidateInstanceDirs is { Count: > 0 })
                 {
                     var waitMs = Math.Max(50, 2500 - (int)(DateTime.UtcNow - startedUtc).TotalMilliseconds);
-                    var delayTask = Task.Delay(waitMs, deadlineCts.Token);
+                    var delayTask = Task.Delay(waitMs, receiveCts.Token);
                     var completed = await Task.WhenAny(receiveTask, delayTask).ConfigureAwait(false);
                     if (completed == delayTask)
                     {
                         fallbackChecked = true;
-                        var fromLogs = await DetectLanPortFromLogsAsync(candidateInstanceDirs, ct: deadlineCts.Token).ConfigureAwait(false);
+                        var fromLogs = await DetectLanPortFromLogsAsync(candidateInstanceDirs, ct: receiveCts.Token).ConfigureAwait(false);
                         if (fromLogs is { } foundPort)
                             return (foundPort, null);
                     }
@@ -354,6 +356,21 @@ public static partial class DreamPortLanService
             {
                 lastError ??= $"监听局域网广播异常：{ex.Message}";
                 break;
+            }
+            finally
+            {
+                if (receiveTask is not null)
+                {
+                    try { receiveCts.Cancel(); } catch { /* ignore */ }
+                    try
+                    {
+                        await receiveTask.ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is OperationCanceledException or SocketException or ObjectDisposedException)
+                    {
+                        // 回退到日志探测或主动退出时，接收任务正常被取消。
+                    }
+                }
             }
 
             var text = Encoding.UTF8.GetString(packet.Buffer);
