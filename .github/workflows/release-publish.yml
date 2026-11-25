@@ -15,7 +15,7 @@ on:
           - Release
           - Beta
       version:
-        description: 'Version to release (e.g., 2.14.2)'
+        description: 'Version to release (e.g., 0.1.0)'
         required: true
         type: string
 
