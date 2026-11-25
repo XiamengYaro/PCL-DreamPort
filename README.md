@@ -7,7 +7,7 @@
 
 ## 当前阶段（Phase 5 / 3b）已实现能力
 
-- **跨平台底座**：基于 .NET 10 / C# 15 / Avalonia 12，支持 macOS（ARM64 / x64）、Windows 与 Linux
+- **跨平台底座**：基于 .NET 10 / C# 15 / Avalonia 12，支持 macOS（ARM64 / x64）、Windows 与 Linux；Java 自动发现覆盖 PATH、`JAVA_HOME` 与 macOS 系统/用户级 `JavaVirtualMachines` 目录
 - **合规底座与隔离**：
   - 严格保留双许可架构与原作者首位署名、赞助链及启动劝导（`McLaunchPrecheck`）
   - Windows 主色相锁定 PCL 蓝色系，禁用上游 Sentry 与联机遥测上报

@@ -7,19 +7,41 @@ using PCL.Core.Logging;
 
 namespace PCL.Core.Minecraft.Java.Scanner;
 
-/// <summary>macOS Java 扫描：JAVA_HOME、JDK bundle 与 command -v java。</summary>
+/// <summary>macOS Java 扫描：JAVA_HOME、系统/用户级 JDK bundle 与 command -v java。</summary>
 public sealed class MacOsJavaScanner : IJavaScanner
 {
     private const string JvmRoot = "/Library/Java/JavaVirtualMachines";
     private const string SystemJvmRoot = "/System/Library/Java/JavaVirtualMachines";
+    private readonly string[] _bundleRoots;
+
+    public MacOsJavaScanner()
+        : this([
+            JvmRoot,
+            SystemJvmRoot,
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library",
+                "Java",
+                "JavaVirtualMachines")
+        ])
+    {
+    }
+
+    internal MacOsJavaScanner(IEnumerable<string> bundleRoots)
+    {
+        _bundleRoots = bundleRoots
+            .Where(root => !string.IsNullOrWhiteSpace(root))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
 
     public void Scan(ICollection<string> results)
     {
         try
         {
             _AddJavaHome(results);
-            _AddBundles(JvmRoot, results);
-            _AddBundles(SystemJvmRoot, results);
+            foreach (var root in _bundleRoots)
+                _AddBundles(root, results);
             _AddFromCommandV(results);
         }
         catch (Exception ex)
@@ -93,7 +115,7 @@ public sealed class MacOsJavaScanner : IJavaScanner
 
     private static void _TryAdd(string javaFolder, ICollection<string> results)
     {
-        var exe = JavaExecutableLayout.GetJavaExePath(javaFolder);
+        var exe = Path.Combine(javaFolder, "java");
         if (File.Exists(exe)) results.Add(exe);
     }
 }
