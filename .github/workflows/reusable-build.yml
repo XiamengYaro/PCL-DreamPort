@@ -97,18 +97,6 @@ jobs:
             scripts/publish.sh "$RID" "$CONFIGURATION" dist
           fi
 
-      - name: Verify Windows client ID
-        if: runner.os == 'Windows' && inputs.include_secrets
-        shell: pwsh
-        env:
-          PCL_MS_CLIENT_ID: ${{ secrets.CLIENT_ID }}
-        run: |
-          $exe = Join-Path (Join-Path "dist" $env:RID) "PCL.Launcher.exe"
-          $text = [Text.Encoding]::Unicode.GetString([IO.File]::ReadAllBytes($exe))
-          if (-not $text.Contains($env:PCL_MS_CLIENT_ID)) {
-            throw "CLIENT_ID was not embedded in $exe"
-          }
-
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
         shell: bash

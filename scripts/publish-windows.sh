@@ -22,6 +22,7 @@ else
 fi
 rm -rf "$OUT"
 mkdir -p "$OUT"
+GENERATED="$OUT/.generated"
 
 "$DOTNET" publish "$ROOT/PCL.Launcher/PCL.Launcher.csproj" \
   -c "$CONFIG" -r "$RID" -p:Platform="$PLATFORM" \
@@ -30,8 +31,24 @@ mkdir -p "$OUT"
   -p:IncludeNativeLibrariesForSelfExtract=true \
   -p:IncludeAllContentForSelfExtract=true \
   -p:UseSharedCompilation=false \
+  -p:EmitCompilerGeneratedFiles=true \
+  -p:CompilerGeneratedFilesOutputPath="$GENERATED" \
   -p:DebugType=None -p:DebugSymbols=false \
   -o "$OUT"
+
+if [ "${PCL_WRITE_SECRET:-}" = "1" ] && [ -n "${PCL_MS_CLIENT_ID:-}" ]; then
+  GENERATED_SECRETS="$(find "$GENERATED" -name 'EnvironmentInterop.g.cs' -print -quit)"
+  [ -n "$GENERATED_SECRETS" ] || {
+    echo "missing generated EnvironmentInterop.g.cs" >&2
+    exit 1
+  }
+  grep -Fq "[\"MS_CLIENT_ID\"] = @\"$PCL_MS_CLIENT_ID\"" "$GENERATED_SECRETS" || {
+    echo "CLIENT_ID was not written into generated release secrets" >&2
+    exit 1
+  }
+  echo "release client ID verified in generated source"
+fi
+rm -rf "$GENERATED"
 
 find "$OUT" -name '*.pdb' -delete
 [ -f "$OUT/PCL.Launcher.exe" ] || {
