@@ -6,7 +6,7 @@ using PCL.Navigation;
 namespace PCL;
 
 /// <summary>
-/// 梦港联机大厅视图模型（TCP/TLS 中继 + 局域网广播 + 房间/成员/好友邀请）。
+/// 梦港联机大厅视图模型（TCP/TLS 中继 + 局域网广播与日志兜底 + WebSocket 实时同步 + 房间/成员/好友邀请）。
 /// </summary>
 public sealed class PageToolsGameLinkViewModel : DreamPortLobbyViewModel
 {
@@ -15,7 +15,10 @@ public sealed class PageToolsGameLinkViewModel : DreamPortLobbyViewModel
             copyToClipboard: CopyTextAsync,
             getSelectedInstanceInfo: ResolveSelectedInstanceInfo,
             goToAccount: () => PageRouter.Navigate(PageIds.Tools, SubPageIds.ToolsDreamPortAccount),
-            registerGlobalLifecycle: true)
+            registerGlobalLifecycle: true,
+            getCandidateInstanceDirs: ResolveCandidateInstanceDirs,
+            getSelectedInstanceDir: ResolveSelectedInstanceDir,
+            enableRealtime: true)
     {
     }
 
@@ -33,6 +36,58 @@ public sealed class PageToolsGameLinkViewModel : DreamPortLobbyViewModel
         {
             return false;
         }
+    }
+
+    private static string? ResolveSelectedInstanceDir()
+    {
+        try
+        {
+            var inst = InstanceList.McMcInstanceSelected;
+            return inst?.PathIndie ?? inst?.PathInstance;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static IReadOnlyList<string> ResolveCandidateInstanceDirs()
+    {
+        var dirs = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void AddInst(McInstance? inst)
+        {
+            if (inst is null)
+                return;
+            try
+            {
+                var p = inst.PathIndie;
+                if (!string.IsNullOrWhiteSpace(p) && seen.Add(p))
+                    dirs.Add(p);
+            }
+            catch
+            {
+                if (!string.IsNullOrWhiteSpace(inst.PathInstance) && seen.Add(inst.PathInstance))
+                    dirs.Add(inst.PathInstance);
+            }
+        }
+
+        AddInst(InstanceList.McMcInstanceSelected);
+        try
+        {
+            foreach (var list in InstanceList.mcInstanceList.Values)
+            {
+                foreach (var item in list)
+                    AddInst(item);
+            }
+        }
+        catch
+        {
+            // 实例列表未加载完成时忽略
+        }
+
+        return dirs;
     }
 
     private static (string? Version, string? Loader) ResolveSelectedInstanceInfo()

@@ -26,6 +26,10 @@
                                Foreground="{DynamicResource ColorBrushGray4}"
                                FontSize="12"
                                Text="{Binding RelaySummary}" />
+                    <TextBlock TextWrapping="Wrap"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               FontSize="12"
+                               Text="{Binding RealtimeStatusText}" />
                     <StackPanel Orientation="Horizontal"
                                 Spacing="10">
                         <ui:MyButton MinWidth="120"
@@ -534,6 +538,11 @@
                                                        Foreground="{DynamicResource ColorBrushGray4}"
                                                        TextWrapping="Wrap"
                                                        Text="{Binding DetailText}" />
+                                            <TextBlock FontSize="12"
+                                                       IsVisible="{Binding HasCompatibilityBadge}"
+                                                       Foreground="{DynamicResource ColorBrush3}"
+                                                       TextWrapping="Wrap"
+                                                       Text="{Binding CompatibilityBadge}" />
                                         </StackPanel>
                                         <ui:MyButton Grid.Column="1"
                                                      MinWidth="84"

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DreamPort.Core.Config;
 using DreamPort.Core.Lobby;
+using DreamPort.Core.ServerPack;
 
 namespace DreamPort.Core.Api;
 
@@ -1647,6 +1648,114 @@ public sealed partial class DreamPortApiClient : IDisposable
         }
 
         return items;
+    }
+
+    public string BuildServerPackFileUrl(string relativePath)
+    {
+        var segments = (relativePath ?? string.Empty)
+            .Replace('\\', '/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Select(Uri.EscapeDataString);
+        return _baseUrl + "/api/client/serverpack/file/" + string.Join("/", segments);
+    }
+
+    public async Task<DreamPortServerPackManifestResult> GetServerPackManifestAsync(CancellationToken ct = default)
+    {
+        var res = await SendAsync(HttpMethod.Get, "/api/client/serverpack", auth: false, ct: ct).ConfigureAwait(false);
+        if (TryClassifyFailure(res, "获取服务器配套模组清单失败", out var reason, out var error))
+        {
+            return new DreamPortServerPackManifestResult(
+                Ok: false,
+                Version: string.Empty,
+                GeneratedAtMs: 0,
+                GameVersion: string.Empty,
+                Loaders: [],
+                ModrinthMods: [],
+                Files: [],
+                TotalBytes: 0,
+                Message: error,
+                FailureReason: reason);
+        }
+
+        var data = UnwrapData(res.Body);
+        if (data.ValueKind != JsonValueKind.Object)
+        {
+            return new DreamPortServerPackManifestResult(
+                Ok: false,
+                Version: string.Empty,
+                GeneratedAtMs: 0,
+                GameVersion: string.Empty,
+                Loaders: [],
+                ModrinthMods: [],
+                Files: [],
+                TotalBytes: 0,
+                Message: ExtractMessage(res.Body, "服务端返回配套模组清单格式无效"));
+        }
+
+        var loaders = new List<string>();
+        if (data.TryGetProperty("loaders", out var loadersEl) && loadersEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in loadersEl.EnumerateArray())
+            {
+                var l = item.ValueKind == JsonValueKind.String ? item.GetString() : item.ToString();
+                if (!string.IsNullOrWhiteSpace(l))
+                    loaders.Add(l.Trim().ToLowerInvariant());
+            }
+        }
+
+        var modrinthMods = new List<DreamPortModrinthModSpec>();
+        if (data.TryGetProperty("modrinthMods", out var mrEl) && mrEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var row in mrEl.EnumerateArray())
+            {
+                if (row.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                var projectId = FirstNonBlank(row, "projectId") ?? string.Empty;
+                var slug = FirstNonBlank(row, "slug") ?? projectId;
+                if (string.IsNullOrWhiteSpace(projectId) && string.IsNullOrWhiteSpace(slug))
+                    continue;
+
+                var title = FirstNonBlank(row, "title", "name") ?? (string.IsNullOrEmpty(slug) ? projectId : slug);
+                var versionId = FirstNonBlank(row, "versionId");
+                var required = !row.TryGetProperty("required", out var reqEl) || reqEl.ValueKind != JsonValueKind.False;
+                modrinthMods.Add(new DreamPortModrinthModSpec(projectId, slug, title, versionId, required));
+            }
+        }
+
+        var files = new List<DreamPortServerPackFile>();
+        if (data.TryGetProperty("files", out var filesEl) && filesEl.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var row in filesEl.EnumerateArray())
+            {
+                if (row.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                var path = GetString(row, "path");
+                var sha = GetString(row, "sha256");
+                if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(sha))
+                    continue;
+
+                files.Add(new DreamPortServerPackFile(
+                    Path: path.Trim(),
+                    Sha256: sha.Trim(),
+                    Size: GetLong(row, "size") ?? 0,
+                    Kind: FirstNonBlank(row, "kind"),
+                    Loader: FirstNonBlank(row, "loader"),
+                    GameVersion: FirstNonBlank(row, "gameVersion")));
+            }
+        }
+
+        return new DreamPortServerPackManifestResult(
+            Ok: true,
+            Version: GetString(data, "version") ?? "0",
+            GeneratedAtMs: GetLong(data, "generatedAt") ?? 0,
+            GameVersion: GetString(data, "gameVersion") ?? string.Empty,
+            Loaders: loaders,
+            ModrinthMods: modrinthMods,
+            Files: files,
+            TotalBytes: GetLong(data, "totalBytes") ?? files.Sum(f => f.Size),
+            Message: "已获取配套模组清单");
     }
 
     public void Dispose()

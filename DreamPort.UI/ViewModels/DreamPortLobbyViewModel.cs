@@ -6,6 +6,7 @@ using DreamPort.Core.Api;
 using DreamPort.Core.Auth;
 using DreamPort.Core.Config;
 using DreamPort.Core.Lobby;
+using DreamPort.Core.Realtime;
 using DreamPort.UI.Services;
 
 namespace DreamPort.UI.ViewModels;
@@ -18,9 +19,13 @@ public sealed record DreamPortLobbyRoomItemVm(
     string VersionSummary,
     string OccupancyText,
     bool HostGone,
+    string CompatibilityBadge,
+    bool IsHardBlocked,
     ICommand JoinCommand)
 {
     public string HeaderText => HostGone ? $"{Name}（房主暂离）" : Name;
+
+    public bool HasCompatibilityBadge => !string.IsNullOrWhiteSpace(CompatibilityBadge);
 
     public string DetailText =>
         $"房码：{Code} · 房主：{Host} · {VersionSummary} · {OccupancyText} · {VisibilityLabel}";
@@ -86,6 +91,11 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
     private readonly Func<(string? Version, string? Loader)>? _getSelectedInstanceInfo;
     private readonly Action? _goToAccount;
     private readonly bool _registerGlobalLifecycle;
+    private readonly Func<IReadOnlyList<string>>? _getCandidateInstanceDirs;
+    private readonly Func<string?>? _getSelectedInstanceDir;
+    private readonly Func<int, string?, string?, string?, CancellationToken, Task<DreamPortGameInfo>> _inspectGameInfo;
+    private readonly bool _enableRealtime;
+    private readonly bool _hasCustomLanDetector;
     private readonly SynchronizationContext? _uiCtx;
     private readonly Func<Task> _globalShutdownDelegate;
 
@@ -94,13 +104,17 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
     private DreamPortLobbyConfigResult? _relayConfig;
     private CancellationTokenSource? _detectCts;
     private CancellationTokenSource? _statsCts;
+    private CancellationTokenSource? _fallbackPollCts;
+    private DreamPortRealtimeClient? _realtimeClient;
     private DreamPortLobbyJoinResult? _pendingJoinResult;
+    private long _realtimeDebounceVersion;
     private bool _loadedOnce;
 
     [ObservableProperty] private string _statusHint = "正在检查梦港账号与中继服务状态...";
     [ObservableProperty] private DreamPortHintLevel _hintLevel = DreamPortHintLevel.Info;
     [ObservableProperty] private string _accountSummary = "未检查";
     [ObservableProperty] private string _relaySummary = "等待检测站点 /api/lobby/config 配置";
+    [ObservableProperty] private string _realtimeStatusText = "实时同步：未连接（进入页面或手动刷新）";
     [ObservableProperty] private bool _isLoggedIn;
     [ObservableProperty] private string _currentUsername = string.Empty;
     [ObservableProperty] private bool _isRelayEnabled;
@@ -157,16 +171,25 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         Func<string, Task<bool>>? copyToClipboard = null,
         Func<(string? Version, string? Loader)>? getSelectedInstanceInfo = null,
         Action? goToAccount = null,
-        bool registerGlobalLifecycle = false)
+        bool registerGlobalLifecycle = false,
+        Func<IReadOnlyList<string>>? getCandidateInstanceDirs = null,
+        Func<string?>? getSelectedInstanceDir = null,
+        Func<int, string?, string?, string?, CancellationToken, Task<DreamPortGameInfo>>? inspectGameInfo = null,
+        bool enableRealtime = false)
     {
         _store = store ?? new DreamPortSessionStore();
         _clientFactory = clientFactory ?? (url => new DreamPortApiClient(url));
         _tunnel = tunnel ?? new DreamPortLobbyTunnel();
+        _hasCustomLanDetector = detectLanPort is not null;
         _detectLanPort = detectLanPort ?? DreamPortLanService.DetectLanPortAsync;
         _copyToClipboard = copyToClipboard ?? (_ => Task.FromResult(false));
         _getSelectedInstanceInfo = getSelectedInstanceInfo;
         _goToAccount = goToAccount;
         _registerGlobalLifecycle = registerGlobalLifecycle;
+        _getCandidateInstanceDirs = getCandidateInstanceDirs;
+        _getSelectedInstanceDir = getSelectedInstanceDir;
+        _inspectGameInfo = inspectGameInfo ?? DreamPortGameInfoService.InspectGameInfoAsync;
+        _enableRealtime = enableRealtime;
         _uiCtx = SynchronizationContext.Current;
         _globalShutdownDelegate = ShutdownActiveForLifecycleAsync;
 
@@ -280,14 +303,18 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
 
             if (!IsLoggedIn)
             {
+                await StopRealtimeAsync().ConfigureAwait(true);
                 HasStaleRoom = false;
                 IncomingInvites.Clear();
                 OutgoingInvites.Clear();
                 FriendOptions.Clear();
                 NotifyCollectionStates();
+                RealtimeStatusText = "实时同步：未登录";
                 SetStatus("尚未登录梦港账号（仅可浏览下方公开大厅）；登录后可创建或加入房间。", DreamPortHintLevel.Warning);
                 return;
             }
+
+            EnsureRealtimeStartedIfEnabled();
 
             if (IsIdle)
             {
@@ -361,11 +388,16 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         var token = cts.Token;
         _detectCts = cts;
         IsDetectingPort = true;
-        SetStatus("正在监听局域网世界广播（224.0.2.60:4445，最多 15 秒）...", DreamPortHintLevel.Info);
+        SetStatus("正在监听局域网世界广播（224.0.2.60:4445，并支持游戏日志端口兜底，最多 15 秒）...", DreamPortHintLevel.Info);
 
         try
         {
-            var (port, err) = await _detectLanPort(TimeSpan.FromSeconds(15), token);
+            var (port, err) = _hasCustomLanDetector
+                ? await _detectLanPort(TimeSpan.FromSeconds(15), token)
+                : await DreamPortLanService.DetectLanPortAsync(
+                    TimeSpan.FromSeconds(15),
+                    _getCandidateInstanceDirs?.Invoke(),
+                    token);
             if (port is { } found)
             {
                 LocalPortInput = found.ToString();
@@ -436,12 +468,28 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
                 return;
             }
 
+            var instanceDir = _getSelectedInstanceDir?.Invoke();
+            var (fallbackVer, fallbackLoader) = ResolveLocalInstanceMeta();
+            var hintVer = string.IsNullOrWhiteSpace(McVersionInput) ? fallbackVer : McVersionInput;
+            var hintLoader = string.IsNullOrWhiteSpace(ModLoaderInput) ? fallbackLoader : ModLoaderInput;
+            var gameInfo = await _inspectGameInfo(localPort.Value, instanceDir, hintVer, hintLoader, CancellationToken.None);
+
+            if (string.IsNullOrWhiteSpace(McVersionInput) && !string.IsNullOrWhiteSpace(gameInfo.Version))
+                McVersionInput = gameInfo.Version;
+            if (string.IsNullOrWhiteSpace(ModLoaderInput) && !string.IsNullOrWhiteSpace(gameInfo.Loader))
+                ModLoaderInput = gameInfo.Loader;
+
+            var finalVer = !string.IsNullOrWhiteSpace(McVersionInput) ? McVersionInput : gameInfo.Version;
+            var finalLoader = !string.IsNullOrWhiteSpace(ModLoaderInput) ? ModLoaderInput : gameInfo.Loader;
+
             var visibility = VisibilityIndex == 1 ? "private" : "public";
             var createRes = await _api.CreateLobbyRoomAsync(
                 name: roomName,
                 visibility: visibility,
-                mcVersion: McVersionInput,
-                modLoader: ModLoaderInput);
+                mcVersion: finalVer,
+                modLoader: finalLoader,
+                modHash: gameInfo.ModHash,
+                modList: gameInfo.Mods);
 
             if (!createRes.Ok || createRes.Room is null || string.IsNullOrWhiteSpace(createRes.Ticket))
             {
@@ -656,6 +704,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
     {
         CancelDetectLanPortInternal();
         StopStatsTicker();
+        await StopRealtimeAsync().ConfigureAwait(false);
         if (_registerGlobalLifecycle)
             DreamPortLobbyLifecycle.ClearActiveShutdown(_globalShutdownDelegate);
         await _tunnel.DisposeAsync().ConfigureAwait(false);
@@ -693,13 +742,32 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
             if (cfg is null)
                 return;
 
-            var joinRes = await _api.JoinLobbyRoomAsync(normalized, mcVersion: McVersionInput);
+            var (localVer, localLoader, localHash, localMods) = ResolveLocalFullGameIdentity();
+            var joinRes = await _api.JoinLobbyRoomAsync(
+                normalized,
+                mcVersion: string.IsNullOrWhiteSpace(McVersionInput) ? localVer : McVersionInput,
+                modHash: localHash);
             if (!joinRes.Ok || joinRes.Room is null || string.IsNullOrWhiteSpace(joinRes.Ticket))
             {
                 if (joinRes.FailureReason == DreamPortFailureReason.Expired)
                     HandleSessionExpired(joinRes.Message ?? "登录已过期，请重新登录。");
                 else
                     SetStatus(joinRes.Message ?? "加入房间失败。", DreamPortHintLevel.Error);
+                return;
+            }
+
+            var compat = DreamPortGameInfoService.EvaluateRoomCompatibility(
+                joinRes.Room,
+                localVer,
+                localLoader,
+                localHash,
+                localMods);
+
+            if (compat.IsHardBlocked)
+            {
+                var err = compat.Reason ?? "当前实例加载器或模组清单与房主不兼容，无法加入该房间。";
+                AddEventLog($"已拦截加入「{joinRes.Room.Name}」：{err}");
+                SetStatus(err, DreamPortHintLevel.Error);
                 return;
             }
 
@@ -710,6 +778,17 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
                     $"目标房间版本为「{diff.RoomVersion}」，你当前的游戏版本为「{diff.MyVersion}」。版本不一致通常无法进入游戏，是否仍要继续建立隧道？";
                 HasPendingVersionMismatch = true;
                 SetStatus("检测到游戏版本不一致，请在下方确认是否仍要加入。", DreamPortHintLevel.Warning);
+                return;
+            }
+
+            if (!forceJoin
+                && compat.HasSoftWarning
+                && (!string.IsNullOrWhiteSpace(joinRes.Room.ModHash) || joinRes.Room.ModList.Count > 0))
+            {
+                _pendingJoinResult = joinRes;
+                VersionMismatchMessage = $"{compat.Reason ?? "检测到模组与房主存在差异"}，是否仍要继续建立隧道？";
+                HasPendingVersionMismatch = true;
+                SetStatus("检测到模组/加载器存在差异，请在下方确认是否仍要加入。", DreamPortHintLevel.Warning);
                 return;
             }
 
@@ -807,9 +886,21 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         if (!res.Ok)
             return;
 
+        var (myVersion, myLoader, myHash, myMods) = ResolveLocalFullGameIdentity();
+        var scored = res.Rooms
+            .Select(room => (
+                Room: room,
+                Compat: DreamPortGameInfoService.EvaluateRoomCompatibility(room, myVersion, myLoader, myHash, myMods)))
+            .OrderByDescending(x => x.Compat.MatchScore)
+            .ThenBy(x => x.Room.HostGone)
+            .ThenByDescending(x => x.Room.CreatedAtMs)
+            .ToList();
+
         PublicRooms.Clear();
-        foreach (var room in res.Rooms)
+        foreach (var item in scored)
         {
+            var room = item.Room;
+            var compat = item.Compat;
             var occ = room.Occupancy is { } n ? $"{n}/{room.MaxPlayers} 人" : $"人数未知（上限 {room.MaxPlayers} 人）";
             var ver = string.IsNullOrWhiteSpace(room.McVersion) ? "全版本" : room.McVersion;
             var loader = string.IsNullOrWhiteSpace(room.ModLoader)
@@ -827,12 +918,14 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
                 VersionSummary: $"{ver} ({loader})",
                 OccupancyText: occ,
                 HostGone: room.HostGone,
+                CompatibilityBadge: compat.BadgeText,
+                IsHardBlocked: compat.IsHardBlocked,
                 JoinCommand: new AsyncRelayCommand(() => JoinByCodeCoreAsync(code, forceJoin: false))));
         }
 
         PublicRoomsSummaryText = PublicRooms.Count == 0
             ? "当前没有公开联机房间，你可以创建房间或通过房码加入好友。"
-            : $"当前共有 {PublicRooms.Count} 个公开房间可加入。";
+            : $"当前共有 {PublicRooms.Count} 个公开房间可加入（已按实例兼容度排序）。";
         OnPropertyChanged(nameof(HasPublicRooms));
         OnPropertyChanged(nameof(HasNoPublicRooms));
     }
@@ -1146,19 +1239,24 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
     private void SyncSessionFromStore()
     {
         var saved = _store.Load();
-        if (!string.Equals(_baseUrl, saved.BaseUrl, StringComparison.Ordinal))
+        var siteChanged = !string.Equals(_baseUrl, saved.BaseUrl, StringComparison.Ordinal);
+        if (siteChanged)
         {
             _baseUrl = saved.BaseUrl;
             _api.Dispose();
             _api = _clientFactory(_baseUrl);
         }
 
+        var tokenChanged = !string.Equals(_api.CurrentToken, saved.Token, StringComparison.Ordinal);
         _api.SetToken(saved.Token);
         IsLoggedIn = !string.IsNullOrEmpty(saved.Token);
         CurrentUsername = saved.Username ?? string.Empty;
         AccountSummary = IsLoggedIn
             ? $"站点地址：{saved.BaseUrl} | 当前账号：{CurrentUsername}（{(saved.IsAdmin ? "管理员" : "已登录玩家")}）"
             : $"站点地址：{saved.BaseUrl} | 当前状态：未登录";
+
+        if (siteChanged || tokenChanged)
+            _ = StopRealtimeAsync();
     }
 
     private void HandleSessionExpired(string message)
@@ -1167,7 +1265,155 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         _api.SetToken(null);
         IsLoggedIn = false;
         CurrentUsername = string.Empty;
+        RealtimeStatusText = "实时同步：未登录";
+        _ = StopRealtimeAsync();
         SetStatus(message, DreamPortHintLevel.Error);
+    }
+
+    private (string? Version, string? Loader) ResolveLocalInstanceMeta()
+    {
+        if (_getSelectedInstanceInfo is null)
+            return (null, null);
+        try
+        {
+            return _getSelectedInstanceInfo();
+        }
+        catch
+        {
+            return (null, null);
+        }
+    }
+
+    private (string? Version, string? Loader, string ModHash, IReadOnlyList<string> Mods) ResolveLocalFullGameIdentity()
+    {
+        var (instVer, instLoader) = ResolveLocalInstanceMeta();
+        var effVer = !string.IsNullOrWhiteSpace(instVer) ? instVer : McVersionInput;
+        var (mods, dirLoader) = DreamPortGameInfoService.ReadLocalMods(_getSelectedInstanceDir?.Invoke());
+        var effLoader = !string.IsNullOrWhiteSpace(instLoader)
+            ? instLoader
+            : (!string.IsNullOrWhiteSpace(ModLoaderInput) ? ModLoaderInput : dirLoader);
+        if ((string.IsNullOrWhiteSpace(effLoader) || string.Equals(effLoader, "vanilla", StringComparison.OrdinalIgnoreCase))
+            && dirLoader is not ("vanilla" or "unknown"))
+        {
+            effLoader = dirLoader;
+        }
+
+        var hash = DreamPortGameInfoService.ComputeModHash(mods);
+        return (effVer, effLoader, hash, mods);
+    }
+
+    private void EnsureRealtimeStartedIfEnabled()
+    {
+        if (!_enableRealtime || !IsLoggedIn || string.IsNullOrEmpty(_api.CurrentToken))
+            return;
+
+        if (_realtimeClient is null)
+        {
+            _realtimeClient = new DreamPortRealtimeClient(
+                () => _baseUrl,
+                () => _api.CurrentToken,
+                OnRealtimeChanged,
+                connected => DispatchUi(() =>
+                    RealtimeStatusText = connected
+                        ? "实时同步：在线（WebSocket 秒级刷新）"
+                        : "实时同步：重连中（30 秒轮询兜底）"),
+                msg => DispatchUi(() => AddEventLog(msg)));
+            _realtimeClient.Start();
+            RealtimeStatusText = "实时同步：正在建立 WebSocket 连接...";
+        }
+
+        StartFallbackPollIfNeeded();
+    }
+
+    private async Task StopRealtimeAsync()
+    {
+        var pollCts = Interlocked.Exchange(ref _fallbackPollCts, null);
+        if (pollCts is not null)
+        {
+            try { pollCts.Cancel(); } catch { /* ignore */ }
+        }
+
+        var rt = Interlocked.Exchange(ref _realtimeClient, null);
+        if (rt is not null)
+        {
+            await rt.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private void StartFallbackPollIfNeeded()
+    {
+        if (_fallbackPollCts is not null)
+            return;
+
+        var cts = new CancellationTokenSource();
+        var token = cts.Token;
+        if (Interlocked.CompareExchange(ref _fallbackPollCts, cts, null) is not null)
+        {
+            cts.Dispose();
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+            try
+            {
+                while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false))
+                {
+                    if (_realtimeClient is { IsConnected: true })
+                        continue;
+
+                    DispatchUi(() => _ = QuietRefreshLobbyAsync());
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // normal stop
+            }
+            finally
+            {
+                Interlocked.CompareExchange(ref _fallbackPollCts, null, cts);
+                cts.Dispose();
+            }
+        });
+    }
+
+    private void OnRealtimeChanged(string ev)
+    {
+        var key = (ev ?? string.Empty).Trim().ToLowerInvariant();
+        if (key is not ("sync" or "lobby" or "lobby-status" or "lobby_status" or "invite" or "lobby-invite" or "friends"))
+            return;
+
+        var ver = Interlocked.Increment(ref _realtimeDebounceVersion);
+        _ = DebouncedRealtimeRefreshAsync(ver);
+    }
+
+    private async Task DebouncedRealtimeRefreshAsync(long ver)
+    {
+        await Task.Delay(300).ConfigureAwait(false);
+        if (ver != Volatile.Read(ref _realtimeDebounceVersion))
+            return;
+
+        DispatchUi(() => _ = QuietRefreshLobbyAsync());
+    }
+
+    private async Task QuietRefreshLobbyAsync()
+    {
+        if (IsBusy || !IsLoggedIn)
+            return;
+
+        try
+        {
+            await RefreshPublicRoomsCoreAsync().ConfigureAwait(true);
+            if (IsIdle)
+                await RefreshInvitesCoreAsync().ConfigureAwait(true);
+            else if (IsHosting && _tunnel.CurrentHostSession is { } hs)
+                await hs.RefreshMembersAsync().ConfigureAwait(true);
+        }
+        catch
+        {
+            // 实时/轮询后台刷新失败不弹窗打断玩家
+        }
     }
 
     private void CancelDetectLanPortInternal()

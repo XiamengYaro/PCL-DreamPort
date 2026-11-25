@@ -174,8 +174,103 @@ public static partial class DreamPortLanService
         }
     }
 
+    public static int? ParseLanPortFromLog(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return null;
+
+        int? bestPort = null;
+        var bestIndex = -1;
+
+        foreach (Match m in EnglishLanLogPattern().Matches(text))
+        {
+            if (int.TryParse(m.Groups[1].Value, out var port) && port is >= 1 and <= 65535 && m.Index > bestIndex)
+            {
+                bestPort = port;
+                bestIndex = m.Index;
+            }
+        }
+
+        foreach (Match m in ChineseLanLogPattern().Matches(text))
+        {
+            if (int.TryParse(m.Groups[1].Value, out var port) && port is >= 1 and <= 65535 && m.Index > bestIndex)
+            {
+                bestPort = port;
+                bestIndex = m.Index;
+            }
+        }
+
+        return bestPort;
+    }
+
+    public static async Task<int?> DetectLanPortFromLogsAsync(
+        IEnumerable<string> candidateInstanceDirs,
+        TimeSpan? maxAge = null,
+        Func<int, CancellationToken, Task<bool>>? portProbe = null,
+        CancellationToken ct = default)
+    {
+        var probe = portProbe ?? ((p, token) => PingLocalPortAsync(p, 1200, token));
+        var cutoff = DateTime.UtcNow - (maxAge ?? TimeSpan.FromHours(6));
+        var candidates = new List<(int Port, DateTime LastWriteUtc)>();
+        var seenDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var rawDir in candidateInstanceDirs)
+        {
+            if (ct.IsCancellationRequested)
+                break;
+
+            var dir = (rawDir ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(dir) || !seenDirs.Add(dir))
+                continue;
+
+            var logPath = Path.Combine(dir, "logs", "latest.log");
+            try
+            {
+                var info = new FileInfo(logPath);
+                if (!info.Exists || info.LastWriteTimeUtc < cutoff)
+                    continue;
+
+                string content;
+                await using (var fs = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var reader = new StreamReader(fs, Encoding.UTF8, detectEncodingFromByteOrderMarks: true))
+                {
+                    content = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+                }
+
+                var port = ParseLanPortFromLog(content);
+                if (port is { } found)
+                    candidates.Add((found, info.LastWriteTimeUtc));
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // 单个实例日志读取失败不影响后续实例
+            }
+        }
+
+        foreach (var item in candidates.OrderByDescending(c => c.LastWriteUtc))
+        {
+            if (ct.IsCancellationRequested)
+                break;
+
+            if (await probe(item.Port, ct).ConfigureAwait(false))
+                return item.Port;
+        }
+
+        return null;
+    }
+
+    public static Task<(int? Port, string? ErrorMessage)> DetectLanPortAsync(
+        TimeSpan timeout,
+        CancellationToken ct = default)
+        => DetectLanPortAsync(timeout, null, ct);
+
     public static async Task<(int? Port, string? ErrorMessage)> DetectLanPortAsync(
         TimeSpan timeout,
+        IReadOnlyList<string>? candidateInstanceDirs,
         CancellationToken ct = default)
     {
         using var udp = new UdpClient(AddressFamily.InterNetwork);
@@ -187,23 +282,69 @@ public static partial class DreamPortLanService
         }
         catch (Exception ex)
         {
+            if (candidateInstanceDirs is { Count: > 0 })
+            {
+                var fromLogs = await DetectLanPortFromLogsAsync(candidateInstanceDirs, ct: ct).ConfigureAwait(false);
+                if (fromLogs is { } foundPort)
+                    return (foundPort, null);
+            }
+
             return (null, $"无法监听组播端口 {LanMulticastPort}（{ex.Message}），请直接填写本地游戏端口");
         }
 
         var joined = JoinMulticastOnAllInterfaces(udp.Client);
         if (joined == 0)
+        {
+            if (candidateInstanceDirs is { Count: > 0 })
+            {
+                var fromLogs = await DetectLanPortFromLogsAsync(candidateInstanceDirs, ct: ct).ConfigureAwait(false);
+                if (fromLogs is { } foundPort)
+                    return (foundPort, null);
+            }
+
             lastError = "未能加入本地组播组（请检查系统本地网络权限或直接填写本地游戏端口）";
+        }
 
         using var deadlineCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadlineCts.CancelAfter(timeout);
 
         var testedPorts = new HashSet<int>();
+        var fallbackChecked = false;
+        var startedUtc = DateTime.UtcNow;
+
         while (!deadlineCts.IsCancellationRequested)
         {
+            if (!fallbackChecked && candidateInstanceDirs is { Count: > 0 } && DateTime.UtcNow - startedUtc >= TimeSpan.FromSeconds(2.5))
+            {
+                fallbackChecked = true;
+                var fromLogs = await DetectLanPortFromLogsAsync(candidateInstanceDirs, ct: deadlineCts.Token).ConfigureAwait(false);
+                if (fromLogs is { } foundPort)
+                    return (foundPort, null);
+            }
+
             UdpReceiveResult packet;
             try
             {
-                packet = await udp.ReceiveAsync(deadlineCts.Token).ConfigureAwait(false);
+                var receiveTask = udp.ReceiveAsync(deadlineCts.Token).AsTask();
+                if (!fallbackChecked && candidateInstanceDirs is { Count: > 0 })
+                {
+                    var waitMs = Math.Max(50, 2500 - (int)(DateTime.UtcNow - startedUtc).TotalMilliseconds);
+                    var delayTask = Task.Delay(waitMs, deadlineCts.Token);
+                    var completed = await Task.WhenAny(receiveTask, delayTask).ConfigureAwait(false);
+                    if (completed == delayTask)
+                    {
+                        fallbackChecked = true;
+                        var fromLogs = await DetectLanPortFromLogsAsync(candidateInstanceDirs, ct: deadlineCts.Token).ConfigureAwait(false);
+                        if (fromLogs is { } foundPort)
+                            return (foundPort, null);
+                    }
+
+                    packet = await receiveTask.ConfigureAwait(false);
+                }
+                else
+                {
+                    packet = await receiveTask.ConfigureAwait(false);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -232,6 +373,13 @@ public static partial class DreamPortLanService
                 return (check.Port, null);
 
             lastError = $"收到广播端口 {check.Port} 但本机连接探活未通";
+        }
+
+        if (!ct.IsCancellationRequested && !fallbackChecked && candidateInstanceDirs is { Count: > 0 })
+        {
+            var fromLogs = await DetectLanPortFromLogsAsync(candidateInstanceDirs, ct: ct).ConfigureAwait(false);
+            if (fromLogs is { } foundPort)
+                return (foundPort, null);
         }
 
         return ct.IsCancellationRequested
@@ -322,6 +470,12 @@ public static partial class DreamPortLanService
 
     [GeneratedRegex(@"^\[MOTD\][\s\S]*?\[/MOTD\]\[AD\](\d{1,5})\[/AD\]$", RegexOptions.Compiled)]
     private static partial Regex LanAdvertisementPattern();
+
+    [GeneratedRegex(@"Published LAN server on port (\d{1,5})", RegexOptions.Compiled)]
+    private static partial Regex EnglishLanLogPattern();
+
+    [GeneratedRegex(@"端口号为\[(\d{1,5})\]", RegexOptions.Compiled)]
+    private static partial Regex ChineseLanLogPattern();
 }
 
 /// <summary>

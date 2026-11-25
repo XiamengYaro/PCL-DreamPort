@@ -43,7 +43,15 @@ public sealed class ToolsPageModule : IPageModule
             "lucide/message-circle",
             "dreamport",
             3,
-            (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortCommunity>(sp))
+            (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortCommunity>(sp)),
+        Sub(
+            PageIds.Tools,
+            SubPageIds.ToolsDreamPortSync,
+            "Tools.Left.DreamPortSync",
+            "lucide/package",
+            "dreamport",
+            4,
+            (sp, _) => ActivatorUtilities.CreateInstance<PageToolsDreamPortSync>(sp))
     ];
 
     public IReadOnlyList<PageDescriptor> Pages { get; } =

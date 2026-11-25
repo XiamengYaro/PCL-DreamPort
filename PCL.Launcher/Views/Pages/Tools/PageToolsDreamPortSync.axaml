@@ -1,0 +1,137 @@
+<ui:MyPageRight xmlns="https://github.com/avaloniaui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:vm="using:PCL"
+                xmlns:dpvm="using:DreamPort.UI.ViewModels"
+                xmlns:ui="using:PCL.UI.Controls"
+                x:DataType="vm:PageToolsDreamPortSyncViewModel"
+                x:CompileBindings="True"
+                x:Class="PCL.Views.Pages.Tools.PageToolsDreamPortSync">
+    <ui:MyScrollViewer x:Name="PanBack"
+                       HorizontalScrollBarVisibility="Disabled"
+                       VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="25,10">
+            <ui:MyHint x:Name="HintStatus"
+                       Margin="0,15,0,0"
+                       Theme="Blue"
+                       Text="{Binding StatusHint}" />
+
+            <ui:MyCard Margin="0,15"
+                       Title="服务器配套模组同步（双源清单 + 兼容性硬拦截）">
+                <StackPanel Margin="25,40,25,20"
+                            Spacing="12">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="{Binding SelectedInstanceSummary}" />
+                    <TextBlock TextWrapping="Wrap"
+                               FontSize="12"
+                               Foreground="{DynamicResource ColorBrushGray4}"
+                               Text="{Binding ServerPackSummary}" />
+
+                    <ui:MyHint IsVisible="{Binding HasCompatibilityWarning}"
+                               Theme="Red"
+                               Text="{Binding CompatibilitySummary}" />
+
+                    <TextBlock IsVisible="{Binding IsApplying}"
+                               FontSize="12"
+                               Foreground="{DynamicResource ColorBrush3}"
+                               TextWrapping="Wrap"
+                               Text="{Binding ProgressSummary}" />
+
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10">
+                        <ui:MyButton MinWidth="130"
+                                     Height="34"
+                                     ColorType="Highlight"
+                                     Command="{Binding CheckServerPackCommand}"
+                                     IsEnabled="{Binding CanCheck}"
+                                     Text="检查配套模组" />
+                        <ui:MyButton MinWidth="120"
+                                     Height="34"
+                                     ColorType="Highlight"
+                                     Command="{Binding ApplyServerPackCommand}"
+                                     IsEnabled="{Binding CanApply}"
+                                     Text="开始同步" />
+                        <ui:MyButton MinWidth="100"
+                                     Height="34"
+                                     ColorType="Red"
+                                     IsVisible="{Binding IsApplying}"
+                                     Command="{Binding CancelServerPackCommand}"
+                                     Text="取消同步" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="服务端直传文件变更计划" />
+                        <TextBlock IsVisible="{Binding HasNoPendingFileActions}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource ColorBrushGray4}"
+                                   Text="暂无待下载、覆盖或清理的直传文件。" />
+                        <ItemsControl IsVisible="{Binding HasPendingFileActions}"
+                                      ItemsSource="{Binding PendingFileActions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="dpvm:DreamPortServerPackFileItemVm">
+                                    <Border Margin="0,6,0,0"
+                                            BorderBrush="{DynamicResource ColorBrushGray4}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="12">
+                                        <Grid ColumnDefinitions="Auto,*"
+                                              ColumnSpacing="12">
+                                            <TextBlock Grid.Column="0"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource ColorBrush3}"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding ActionLabel}" />
+                                            <StackPanel Grid.Column="1"
+                                                        Spacing="2">
+                                                <TextBlock FontWeight="SemiBold"
+                                                           TextWrapping="Wrap"
+                                                           Text="{Binding PathText}" />
+                                                <TextBlock FontSize="12"
+                                                           Foreground="{DynamicResource ColorBrushGray4}"
+                                                           Text="{Binding DetailText}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel IsVisible="{Binding HasModrinthItems}"
+                                Spacing="6">
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="Modrinth 指定模组清单" />
+                        <ItemsControl ItemsSource="{Binding ModrinthItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="dpvm:DreamPortModrinthModItemVm">
+                                    <Border Margin="0,6,0,0"
+                                            BorderBrush="{DynamicResource ColorBrushGray4}"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Padding="12">
+                                        <Grid ColumnDefinitions="*,Auto"
+                                              ColumnSpacing="10">
+                                            <StackPanel Grid.Column="0"
+                                                        Spacing="2">
+                                                <TextBlock FontWeight="SemiBold"
+                                                           Text="{Binding Title}" />
+                                                <TextBlock FontSize="12"
+                                                           Foreground="{DynamicResource ColorBrushGray4}"
+                                                           TextWrapping="Wrap"
+                                                           Text="{Binding DetailText}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1"
+                                                       VerticalAlignment="Center"
+                                                       FontWeight="SemiBold"
+                                                       Text="{Binding StatusLabel}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </ui:MyCard>
+        </StackPanel>
+    </ui:MyScrollViewer>
+</ui:MyPageRight>

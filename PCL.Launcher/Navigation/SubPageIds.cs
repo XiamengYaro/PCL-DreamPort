@@ -66,6 +66,7 @@ public static class SubPageIds
     public static readonly SubPageId ToolsTest = new(PageIds.Tools, "ToolsTest");
     public static readonly SubPageId ToolsDreamPortAccount = new(PageIds.Tools, "ToolsDreamPortAccount");
     public static readonly SubPageId ToolsDreamPortCommunity = new(PageIds.Tools, "ToolsDreamPortCommunity");
+    public static readonly SubPageId ToolsDreamPortSync = new(PageIds.Tools, "ToolsDreamPortSync");
 
     public static readonly SubPageId VersionOverall = new(PageIds.InstanceSetup, "VersionOverall");
     public static readonly SubPageId VersionSetup = new(PageIds.InstanceSetup, "VersionSetup");
