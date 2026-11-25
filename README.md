@@ -38,6 +38,17 @@
 | Windows 10 1809+ / Windows 11 | x64 / ARM64 | [.NET 10 Desktop Runtime](https://get.dot.net/10) |
 | Linux（Ubuntu 22.04+ / Arch 等） | x64 / ARM64 | [.NET 10 Runtime](https://get.dot.net/10) |
 
+### macOS 首次启动
+
+当前公开构建使用 ad-hoc 签名，尚未使用 Apple Developer ID 公证。通过浏览器下载后，如果系统提示无法验证开发者或拒绝启动，可移除已安装应用的下载隔离标记后重新打开：
+
+```bash
+xattr -dr com.apple.quarantine '/Applications/PCL-梦港.app'
+open '/Applications/PCL-梦港.app'
+```
+
+只对从项目官方 Release 或 `dl.xmcraft.cn` 下载的包执行上述操作。
+
 ## 构建与环境变量
 
 构建本仓库需安装 **.NET 11 SDK**（溶液 `TargetFramework` 为 `net10.0`，`LangVersion 15.0`）。
