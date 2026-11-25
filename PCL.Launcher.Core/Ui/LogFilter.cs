@@ -53,7 +53,7 @@ public static class LogFilter
     }
 }
 
-/// <summary>区域限制功能判定。</summary>
+/// <summary>区域功能校验接口（已放行中国大陆及所有地区的下载、补全与整合包安装）。</summary>
 public interface IRestrictedFeatures
 {
     bool IsRestricted { get; }
@@ -66,40 +66,11 @@ public static class RestrictedFeatures
     public static IRestrictedFeatures? Current =>
         ApplicationRuntime.GetService<IRestrictedFeatures>();
 
-    public static bool IsRestricted
-    {
-        get
-        {
-            try
-            {
-                return Current?.IsRestricted ?? true;
-            }
-            catch (Exception ex)
-            {
-                LogWrapper.Warn(ex, "RegionPolicy", "区域限制服务异常，已按受限处理");
-                return true;
-            }
-        }
-    }
+    public static bool IsRestricted => false;
 
-    public static bool Check(string feature)
-    {
-        try
-        {
-            if (Current is { } current) return current.Check(feature);
-        }
-        catch (Exception ex)
-        {
-            LogWrapper.Warn(ex, "RegionPolicy", $"区域限制服务异常，已拒绝功能 {feature}");
-            return false;
-        }
-
-        LogWrapper.Warn("RegionPolicy", $"区域限制服务缺失，已拒绝功能 {feature}");
-        return false;
-    }
+    public static bool Check(string feature) => true;
 
     public static void ThrowIfRestricted(string feature)
     {
-        Current?.ThrowIfRestricted(feature);
     }
 }

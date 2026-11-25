@@ -19,7 +19,7 @@
 - **多设备白名单配置云同步**：「工具 → 同步与工具」支持对更新/下载/启动窗口/外观主题等便携非敏感配置进行云端备份与同步（`/api/client/profile-sync`），严格排除账号凭据、MirrorChyan Key、代理帐密、Java 路径与自定义启动参数，并通过乐观锁 `revision` 拦截跨设备冲突交由玩家显式决策
 - **AI 启动日志排障**：「工具 → 同步与工具」与实时日志页操作栏集成 `AI 诊断`（`/api/ai/log-diagnose*`），发送前在本地完成有界尾部读取与玩家名/用户目录/各类令牌脱敏，提交后异步短轮询获取结构化结论、依据与可执行建议
 - **社区资源当页 AI 翻译与功能解析**：资源搜索页新增当页 AI 翻译切换按钮（最多 30 项/页 + 内存缓存），资源详情页新增 `AI 功能解析` 按钮并在默认翻译无结果时回落站内 AI 翻译（`/api/ai/resource/{translate,explain}`）
-- **下载与更新源分工**：游戏数据下载沿用 PCL 原生官方源 / BMCLAPI 并隔离下载层 User-Agent（`PCL-DreamPort/{version}`）；梦港加速源（`https://dl.xmcraft.cn`，`DP_UPDATE_MIRROR_URL`）仅用于启动器更新等配套服务
+- **下载与更新源分工**：已移除中国大陆地区的 Minecraft 下载、补全与整合包安装区域限制；游戏数据下载沿用 PCL 原生官方源 / BMCLAPI 并隔离下载层 User-Agent（`PCL-DreamPort/{version}`），梦港加速源（`https://dl.xmcraft.cn`，`DP_UPDATE_MIRROR_URL`）仅用于启动器更新等配套服务
 - **极简在线心跳与 GitHub/镜像双源自动更新**：「设置 → 更新」与启动检查优先请求 `dl.xmcraft.cn/pcl-dreamport/{beta/}latest.json`（严格校验 schema / product / https / 64 位 SHA-256，任一不通过即静默回落 GitHub Releases + `SHA256SUMS`），严格按 OS+架构匹配安装包（绝不跨架构误下），支持「跳过此版本」持久化、临时 `.dp-update-part` 校验与 macOS `ditto` + `open -n` 替换脚本；登录后仅上报极简在线心跳（`/api/client/heartbeat` 仅包含 `clientVersion`/`platform`/`clientStartedAt`，绝不上传模组或本机设置，也不应用任何远端下发动作），登出、切站或退出自动触发 `/api/client/offline` 下线通知
 - **完整梦港账号系统与多设备管理**：「工具 → 梦港账号」支持配置站点地址（切换站点自动向旧站点 `/api/logout` 注销并清理旧凭据与主页缓存）、浏览器确认 + 同码扫码授权登录（`/api/qr-login/*`）、网页注册/安全与通行密钥/封禁申诉快捷直达、系统加密存储（DPAPI / Keychain）、严格区分会话过期（401）与网络波动，以及活跃设备查看与单设备/批量踢出（`/api/auth/sessions*`）
 - **六步入服引导流程（原生 PCL 控件）**：对接 `/api/user/progress` 实时展示六步进度，内置 QQ 绑定/解绑（`/api/user/qq/*`）、使用当前启动器已登录微软正版档案一键验证正版 ID（`POST /api/user/minecraft/verify-token`）及微软设备码备用验证、邀请码入服（`POST /api/invite/apply`）、可交互入服问卷与 SSE 实时逐题 AI 评分反馈（`/api/questionnaire/{config,stream,submit}`），以及被拒绝/封禁状态引导与问卷人工复核申诉（`/api/questionnaire/appeal*`）

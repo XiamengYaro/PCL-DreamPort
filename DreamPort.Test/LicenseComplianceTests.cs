@@ -251,6 +251,31 @@ public sealed class LicenseComplianceTests
             PageSetupFeedbackViewModel.BuildIssuesApiUrl("https://git.xmcraft.cn/Xiameng/PCL-DreamPort"));
     }
 
+    [TestMethod]
+    public void GameDownloadAndModpack_AreNotBlockedByRegionRestriction()
+    {
+        Assert.IsFalse(RestrictedFeatures.IsRestricted);
+
+        var bridge = new PCL.UI.Bridges.RestrictedFeaturesBridge();
+        Assert.IsFalse(bridge.IsRestricted);
+
+        foreach (var feature in new[]
+                 {
+                     "minecraft-install",
+                     "minecraft-repair",
+                     "minecraft-loader-install",
+                     "modpack-install",
+                     "online-modpack-install",
+                     "minecraft-launch-missing-files"
+                 })
+        {
+            Assert.IsTrue(RestrictedFeatures.Check(feature), $"RestrictedFeatures.Check 应放行 {feature}");
+            RestrictedFeatures.ThrowIfRestricted(feature);
+            Assert.IsTrue(bridge.Check(feature), $"RestrictedFeaturesBridge.Check 应放行 {feature}");
+            bridge.ThrowIfRestricted(feature);
+        }
+    }
+
     internal static bool ContainsColorEmoji(string text, out string offense)
     {
         foreach (var rune in text.EnumerateRunes())
