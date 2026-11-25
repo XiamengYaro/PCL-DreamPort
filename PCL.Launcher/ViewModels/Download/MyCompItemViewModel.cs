@@ -15,15 +15,11 @@ public partial class MyCompItemViewModel : ViewModelBase
 
     private bool _showLoaderDesc = true;
     private bool _showMcVersionDesc = true;
-    private string? _aiTitleZh;
-    private string? _aiSummaryZh;
 
     public string DescriptionText =>
-        !string.IsNullOrWhiteSpace(_aiSummaryZh)
-            ? _aiSummaryZh!
-            : (Project?.Description ?? string.Empty)
-                .Replace("\r", string.Empty)
-                .Replace("\n", string.Empty);
+        (Project?.Description ?? string.Empty)
+            .Replace("\r", string.Empty)
+            .Replace("\n", string.Empty);
 
     [ObservableProperty] public partial string? DescriptionToolTip { get; set; }
 
@@ -57,10 +53,7 @@ public partial class MyCompItemViewModel : ViewModelBase
                 ? "CurseForge"
                 : "Modrinth";
 
-    public string SubTitleText =>
-        !string.IsNullOrWhiteSpace(_aiTitleZh) && Project is not null
-            ? Project.RawName
-            : Project?.GetControlTitle(true).Value ?? string.Empty;
+    public string SubTitleText => Project?.GetControlTitle(true).Value ?? string.Empty;
 
     public bool SubTitleVisible => !string.IsNullOrEmpty(SubTitleText);
 
@@ -69,10 +62,7 @@ public partial class MyCompItemViewModel : ViewModelBase
             ? Lang.TimeSpan(lastUpdate - DateTime.Now, 1)
             : string.Empty;
 
-    public string TitleText =>
-        !string.IsNullOrWhiteSpace(_aiTitleZh)
-            ? _aiTitleZh!
-            : Project?.GetControlTitle(true).Key ?? string.Empty;
+    public string TitleText => Project?.GetControlTitle(true).Key ?? string.Empty;
 
     [ObservableProperty] public partial bool UseSharedSizeGroups { get; set; } = true;
 
@@ -119,8 +109,6 @@ public partial class MyCompItemViewModel : ViewModelBase
     {
         _showMcVersionDesc = showMcVersionDesc;
         _showLoaderDesc = showLoaderDesc;
-        _aiTitleZh = null;
-        _aiSummaryZh = null;
         Project = project;
         Tags = [.. project.Tags];
         ShowVersion = showMcVersionDesc || showLoaderDesc;
@@ -178,22 +166,6 @@ public partial class MyCompItemViewModel : ViewModelBase
     public void SetDescriptionToolTip(string? tooltip)
     {
         DescriptionToolTip = tooltip;
-    }
-
-    public void ApplyAiTranslation(string? titleZh, string? summaryZh)
-    {
-        _aiTitleZh = string.IsNullOrWhiteSpace(titleZh) ? null : titleZh.Trim();
-        _aiSummaryZh = string.IsNullOrWhiteSpace(summaryZh) ? null : summaryZh.Trim();
-        NotifyTextProperties();
-    }
-
-    public void ClearAiTranslation()
-    {
-        if (_aiTitleZh is null && _aiSummaryZh is null)
-            return;
-        _aiTitleZh = null;
-        _aiSummaryZh = null;
-        NotifyTextProperties();
     }
 
     [RelayCommand]

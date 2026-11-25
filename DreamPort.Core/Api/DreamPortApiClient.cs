@@ -2303,58 +2303,6 @@ public sealed partial class DreamPortApiClient : IDisposable
         return (true, GetBool(data, "available"), null);
     }
 
-    public async Task<DreamPortResourceTranslateResult> TranslateResourcePageAsync(
-        IReadOnlyList<DreamPortResourceTranslateItem> items,
-        CancellationToken ct = default)
-    {
-        if (string.IsNullOrEmpty(_token))
-            return new DreamPortResourceTranslateResult(false, new Dictionary<string, DreamPortResourceTranslatedItem>(), 0, "未登录", DreamPortFailureReason.Expired);
-
-        var batch = (items ?? [])
-            .Where(x => !string.IsNullOrWhiteSpace(x.Id))
-            .Take(30)
-            .Select(x => new
-            {
-                id = x.Id.Trim(),
-                title = x.Title ?? string.Empty,
-                summary = x.Summary ?? string.Empty
-            })
-            .ToArray();
-
-        if (batch.Length == 0)
-            return new DreamPortResourceTranslateResult(true, new Dictionary<string, DreamPortResourceTranslatedItem>(), 0);
-
-        var res = await SendAsync(
-            HttpMethod.Post,
-            "/api/ai/resource/translate",
-            new { items = batch },
-            auth: true,
-            timeout: TimeSpan.FromSeconds(35),
-            ct: ct).ConfigureAwait(false);
-
-        if (TryClassifyFailure(res, "AI 资源翻译失败", out var reason, out var error))
-            return new DreamPortResourceTranslateResult(false, new Dictionary<string, DreamPortResourceTranslatedItem>(), 0, error, reason);
-
-        var data = UnwrapData(res.Body);
-        var map = new Dictionary<string, DreamPortResourceTranslatedItem>(StringComparer.Ordinal);
-        if (data.ValueKind == JsonValueKind.Object
-            && data.TryGetProperty("translations", out var transEl)
-            && transEl.ValueKind == JsonValueKind.Object)
-        {
-            foreach (var prop in transEl.EnumerateObject())
-            {
-                if (prop.Value.ValueKind != JsonValueKind.Object)
-                    continue;
-                var titleZh = GetString(prop.Value, "titleZh")?.Trim() ?? string.Empty;
-                var summaryZh = GetString(prop.Value, "summaryZh")?.Trim() ?? string.Empty;
-                if (!string.IsNullOrEmpty(titleZh) || !string.IsNullOrEmpty(summaryZh))
-                    map[prop.Name] = new DreamPortResourceTranslatedItem(titleZh, summaryZh);
-            }
-        }
-
-        return new DreamPortResourceTranslateResult(true, map, GetInt(data, "cacheHits") ?? 0);
-    }
-
     public async Task<DreamPortResourceExplainResult> ExplainResourceAsync(
         DreamPortResourceExplainRequest request,
         CancellationToken ct = default)

@@ -5,7 +5,7 @@ using DreamPort.Core.Api;
 namespace DreamPort.Core.Services;
 
 /// <summary>
-/// 社区资源当页 AI 翻译与模组/整合包功能 AI 解析助手（内置有界内存缓存，同一资源不重复消耗配额）。
+/// 模组/整合包功能 AI 解析助手（内置有界内存缓存，同一资源不重复消耗配额）。
 /// </summary>
 public sealed class DreamPortResourceAiHelper
 {
@@ -13,60 +13,7 @@ public sealed class DreamPortResourceAiHelper
 
     public static DreamPortResourceAiHelper Shared { get; } = new();
 
-    private readonly ConcurrentDictionary<string, DreamPortResourceTranslatedItem> _translateCache = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, DreamPortResourceExplainResult> _explainCache = new(StringComparer.Ordinal);
-
-    public async Task<DreamPortResourceTranslateResult> TranslatePageAsync(
-        DreamPortApiClient api,
-        IReadOnlyList<DreamPortResourceTranslateItem> items,
-        CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(api);
-        var normalized = (items ?? [])
-            .Where(x => !string.IsNullOrWhiteSpace(x.Id))
-            .Take(30)
-            .ToArray();
-
-        if (normalized.Length == 0)
-            return new DreamPortResourceTranslateResult(true, new Dictionary<string, DreamPortResourceTranslatedItem>(), 0);
-
-        var output = new Dictionary<string, DreamPortResourceTranslatedItem>(StringComparer.Ordinal);
-        var misses = new List<DreamPortResourceTranslateItem>();
-        var localHits = 0;
-
-        foreach (var item in normalized)
-        {
-            var key = BuildTranslateCacheKey(item);
-            if (_translateCache.TryGetValue(key, out var hit))
-            {
-                output[item.Id.Trim()] = hit;
-                localHits++;
-            }
-            else
-            {
-                misses.Add(item);
-            }
-        }
-
-        if (misses.Count == 0)
-            return new DreamPortResourceTranslateResult(true, output, localHits);
-
-        var remote = await api.TranslateResourcePageAsync(misses, ct).ConfigureAwait(false);
-        foreach (var kv in remote.Translations)
-        {
-            output[kv.Key] = kv.Value;
-            var match = misses.FirstOrDefault(m => string.Equals(m.Id.Trim(), kv.Key, StringComparison.Ordinal));
-            if (match is not null)
-                StoreBounded(_translateCache, BuildTranslateCacheKey(match), kv.Value);
-        }
-
-        return new DreamPortResourceTranslateResult(
-            Ok: remote.Ok || output.Count > 0,
-            Translations: output,
-            CacheHits: localHits + remote.CacheHits,
-            Message: remote.Message,
-            FailureReason: remote.FailureReason);
-    }
 
     public async Task<DreamPortResourceExplainResult> ExplainAsync(
         DreamPortApiClient api,
@@ -115,9 +62,6 @@ public sealed class DreamPortResourceAiHelper
 
         return sb.ToString().Trim();
     }
-
-    private static string BuildTranslateCacheKey(DreamPortResourceTranslateItem item)
-        => $"{item.Id.Trim()}\n{item.Title}\n{item.Summary}";
 
     private static string BuildExplainCacheKey(DreamPortResourceExplainRequest req)
         => $"{req.Kind}|{req.Name}|{req.Summary}|{req.Description}|{string.Join(",", req.Categories)}|{string.Join(",", req.Mods)}";

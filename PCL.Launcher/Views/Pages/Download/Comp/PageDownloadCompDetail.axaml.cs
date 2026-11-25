@@ -202,22 +202,6 @@ public partial class PageDownloadCompDetail : MyPageRight
                         "Download.Comp.Detail.DescriptionTranslating",
                         project.TranslatedName)));
             var chineseDescription = await project.ChineseDescription;
-            if (string.IsNullOrWhiteSpace(chineseDescription))
-            {
-                var session = new DreamPortSessionStore().Load();
-                if (!string.IsNullOrWhiteSpace(session.Token))
-                {
-                    using var api = new DreamPortApiClient(session.BaseUrl);
-                    api.SetToken(session.Token);
-                    var aiRes = await DreamPortResourceAiHelper.Shared.TranslatePageAsync(
-                        api,
-                        [new DreamPortResourceTranslateItem(project.Id, project.RawName, project.Description)]);
-                    if (aiRes.Translations.TryGetValue(project.Id, out var tr))
-                        chineseDescription = string.IsNullOrWhiteSpace(tr.TitleZh)
-                            ? tr.SummaryZh
-                            : $"{tr.TitleZh}\n\n{tr.SummaryZh}".Trim();
-                }
-            }
             if (string.IsNullOrWhiteSpace(chineseDescription)) return;
             await DialogService.Instance.ShowAsync(
                 new TextDialogRequest

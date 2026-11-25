@@ -404,22 +404,6 @@ public sealed record DreamPortLogDiagnosePollResult(
     long LatencyMs = 0,
     DreamPortFailureReason? FailureReason = null);
 
-public sealed record DreamPortResourceTranslateItem(
-    string Id,
-    string Title,
-    string Summary);
-
-public sealed record DreamPortResourceTranslatedItem(
-    string TitleZh,
-    string SummaryZh);
-
-public sealed record DreamPortResourceTranslateResult(
-    bool Ok,
-    IReadOnlyDictionary<string, DreamPortResourceTranslatedItem> Translations,
-    int CacheHits,
-    string? Message = null,
-    DreamPortFailureReason? FailureReason = null);
-
 public sealed record DreamPortResourceExplainRequest(
     string Kind,
     string Name,

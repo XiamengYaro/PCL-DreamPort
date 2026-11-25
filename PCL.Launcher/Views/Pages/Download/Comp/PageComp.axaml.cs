@@ -3,10 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using DreamPort.Core.Api;
-using DreamPort.Core.Auth;
-using DreamPort.Core.Services;
 using PCL.Core.App.Localization;
-using PCL.Core.UI.Hints;
 using PCL.Navigation;
 using PCL.UI.Controls;
 
@@ -21,9 +18,6 @@ public partial class PageComp : UserControl
 {
     public const int PageSize = PageCompViewModel.PageSize;
 
-    private readonly Dictionary<string, DreamPortResourceTranslatedItem> _aiTranslations = new(StringComparer.Ordinal);
-    private bool _aiTranslateActive;
-    private bool _aiTranslateBusy;
     private IReadOnlyList<CompCategoryTag> _categoryTags = [];
 
     public PageComp()
@@ -33,23 +27,19 @@ public partial class PageComp : UserControl
         PanSearchBox.Search += (_, _) => StartNewSearch();
         PanSearchBox.TextBox.KeyDown += OnSearchBoxKeyDown;
         BtnSearchReset.Click += (_, _) => ResetFilter();
-        BtnAiTranslatePage.Click += async (_, _) => await ToggleAiTranslatePageAsync();
         BtnSearchInstallModPack.Click += (_, _) => ViewModel.InstallModPackCommand.Execute(null);
         BtnPageFirst.Click += (_, _) =>
         {
-            _aiTranslateActive = false;
             SyncFiltersToViewModel();
             ViewModel.FirstPageCommand.Execute(null);
         };
         BtnPageLeft.Click += (_, _) =>
         {
-            _aiTranslateActive = false;
             SyncFiltersToViewModel();
             ViewModel.PreviousPageCommand.Execute(null);
         };
         BtnPageRight.Click += (_, _) =>
         {
-            _aiTranslateActive = false;
             SyncFiltersToViewModel();
             ViewModel.NextPageCommand.Execute(null);
         };
@@ -258,10 +248,6 @@ public partial class PageComp : UserControl
                 var item = new MyVirtualizingElement<MyCompItem>(() =>
                 {
                     var compItem = new MyCompItem(project);
-                    if (_aiTranslateActive
-                        && project.Project is { Id.Length: > 0 } compProj
-                        && _aiTranslations.TryGetValue(compProj.Id, out var tr))
-                        compItem.ViewModel.ApplyAiTranslation(tr.TitleZh, tr.SummaryZh);
                     compItem.Click += OnCompItemClick;
                     return compItem;
                 })
@@ -327,74 +313,8 @@ public partial class PageComp : UserControl
 
     private void StartNewSearch()
     {
-        _aiTranslateActive = false;
         SyncFiltersToViewModel();
         ViewModel.StartNewSearch();
-    }
-
-    private async Task ToggleAiTranslatePageAsync()
-    {
-        if (_aiTranslateBusy)
-            return;
-
-        if (_aiTranslateActive)
-        {
-            _aiTranslateActive = false;
-            RenderResults();
-            HintService.Show(Hints.Info("已恢复当前页资源原始标题与简介", false));
-            return;
-        }
-
-        var projects = ViewModel.Projects;
-        if (projects.Count == 0)
-        {
-            HintService.Show(Hints.Warning("当前页暂无可翻译的资源"));
-            return;
-        }
-
-        var session = new DreamPortSessionStore().Load();
-        if (string.IsNullOrWhiteSpace(session.Token))
-        {
-            HintService.Show(Hints.Warning("请先在「工具 → 梦港账号」登录已过审账号后再使用当页 AI 翻译"));
-            return;
-        }
-
-        var items = projects
-            .Where(vm => vm.Project is { Id.Length: > 0 })
-            .Take(30)
-            .Select(vm => new DreamPortResourceTranslateItem(vm.Project!.Id, vm.Project.RawName, vm.Project.Description))
-            .ToArray();
-
-        _aiTranslateBusy = true;
-        BtnAiTranslatePage.IsEnabled = false;
-        try
-        {
-            HintService.Show(Hints.Info($"正在翻译当前页 {items.Length} 项资源，请稍候...", false));
-            using var api = new DreamPortApiClient(session.BaseUrl);
-            api.SetToken(session.Token);
-            var res = await DreamPortResourceAiHelper.Shared.TranslatePageAsync(api, items);
-            if (!res.Ok && res.Translations.Count == 0)
-            {
-                HintService.Show(Hints.Warning(res.Message ?? "AI 翻译暂时不可用"));
-                return;
-            }
-
-            foreach (var kv in res.Translations)
-                _aiTranslations[kv.Key] = kv.Value;
-
-            _aiTranslateActive = true;
-            RenderResults();
-            HintService.Show(Hints.Success($"已翻译当前页 {res.Translations.Count} 项（命中缓存 {res.CacheHits} 项）", false));
-        }
-        catch (Exception ex)
-        {
-            LauncherCommon.Log(ex, "当页 AI 翻译资源失败", LauncherLogLevel.Hint, userSummary: ex.Message);
-        }
-        finally
-        {
-            _aiTranslateBusy = false;
-            BtnAiTranslatePage.IsEnabled = true;
-        }
     }
 
     private void SyncFiltersToViewModel()
@@ -458,7 +378,6 @@ public partial class PageComp : UserControl
         BtnSearchReset.SetLocalizedValue(
             ToolTip.TipProperty,
             "Download.Comp.Filter.Reset");
-        ToolTip.SetTip(BtnAiTranslatePage, "使用梦港 AI 翻译当前页资源（需登录已过审账号）");
         BtnSearchInstallModPack.SetLocalizedValue(
             ToolTip.TipProperty,
             "Download.Comp.Filter.InstallModpack.ToolTip");

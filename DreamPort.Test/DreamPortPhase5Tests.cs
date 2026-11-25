@@ -530,39 +530,13 @@ public sealed class DreamPortPhase5Tests
     }
 
     [TestMethod]
-    public async Task ResourceAi_TranslatesUpTo30Items_Explains_AndUsesMemoryCache()
+    public async Task ResourceAi_ExplainUsesMemoryCache()
     {
-        var translateCalls = 0;
         var explainCalls = 0;
 
         using var api = new DreamPortApiClient("https://xmcraft.cn", new StubHttpHandler((req, _) =>
         {
             var path = req.RequestUri!.AbsolutePath;
-            if (path == "/api/ai/resource/translate")
-            {
-                translateCalls++;
-                using var doc = JsonDocument.Parse(req.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
-                var arr = doc.RootElement.GetProperty("items");
-                Assert.IsTrue(arr.GetArrayLength() <= 30, "单次当页翻译不得超过 30 条");
-
-                var dict = new Dictionary<string, object>();
-                foreach (var it in arr.EnumerateArray())
-                {
-                    var id = it.GetProperty("id").GetString()!;
-                    dict[id] = new
-                    {
-                        titleZh = $"中文标题_{id}",
-                        summaryZh = $"中文简介_{id}"
-                    };
-                }
-
-                return JsonResponse(HttpStatusCode.OK, new
-                {
-                    success = true,
-                    data = new { translations = dict, cacheHits = 1 }
-                });
-            }
-
             if (path == "/api/ai/resource/explain")
             {
                 explainCalls++;
@@ -584,20 +558,6 @@ public sealed class DreamPortPhase5Tests
         api.SetToken("res-ai-token");
 
         var helper = new DreamPortResourceAiHelper();
-        var items = Enumerable.Range(1, 35)
-            .Select(i => new DreamPortResourceTranslateItem($"m{i}", $"Mod {i}", $"Summary {i}"))
-            .ToArray();
-
-        var first = await helper.TranslatePageAsync(api, items);
-        Assert.IsTrue(first.Ok);
-        Assert.HasCount(30, first.Translations);
-        Assert.AreEqual(1, translateCalls);
-
-        // 同一页再次调用全部命中本地内存缓存，不再发出 HTTP 请求
-        var second = await helper.TranslatePageAsync(api, items);
-        Assert.IsTrue(second.Ok);
-        Assert.AreEqual(1, translateCalls);
-        Assert.AreEqual(30, second.CacheHits);
 
         var explainReq = new DreamPortResourceExplainRequest(
             "mod", "Sodium", "Modern rendering engine", "Long description", ["optimization"], []);
