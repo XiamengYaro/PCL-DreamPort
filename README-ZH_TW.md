@@ -50,7 +50,7 @@ PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.0-poc di
 | 環境變數 / 建置參數 | 預設值 | 說明 |
 |---|---|---|
 | `DP_BASE_URL` | `https://xmcraft.cn` | DreamPort 站點根位址 |
-| `DP_REPO_URL` | `https://github.com/Xiameng/PCL-DreamPort` | 開源倉庫位址 |
+| `DP_REPO_URL` | `https://github.com/XiamengYaro/PCL-DreamPort` | 開源倉庫位址 |
 | `DP_UPDATE_MIRROR_URL` | `https://dl.xmcraft.cn` | 更新等配套服務下載加速源（不用於遊戲資料下載） |
 | `PCL_MS_CLIENT_ID` | （必填） | 自有 Azure 正版登入 Client ID（建置期注入；Debug 支援 `DP_MS_CLIENT_ID`） |
 

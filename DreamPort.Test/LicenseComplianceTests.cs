@@ -244,13 +244,13 @@ public sealed class LicenseComplianceTests
         Assert.IsEmpty(UpdateManager.remoteServer.GetAnnouncementList().Content);
 
         Assert.AreEqual(
-            "https://api.github.com/repos/Xiameng/PCL-DreamPort/issues?state=all&sort=created&per_page=200",
-            PageSetupFeedbackViewModel.BuildIssuesApiUrl("https://github.com/Xiameng/PCL-DreamPort"));
+            "https://api.github.com/repos/XiamengYaro/PCL-DreamPort/issues?state=all&sort=created&per_page=200",
+            PageSetupFeedbackViewModel.BuildIssuesApiUrl("https://github.com/XiamengYaro/PCL-DreamPort"));
         Assert.AreEqual(
             "https://api.github.com/repos/Owner/CustomRepo/issues?state=all&sort=created&per_page=200",
             PageSetupFeedbackViewModel.BuildIssuesApiUrl("https://github.com/Owner/CustomRepo.git/"));
         Assert.AreEqual(
-            "https://api.github.com/repos/Xiameng/PCL-DreamPort/issues?state=all&sort=created&per_page=200",
+            "https://api.github.com/repos/XiamengYaro/PCL-DreamPort/issues?state=all&sort=created&per_page=200",
             PageSetupFeedbackViewModel.BuildIssuesApiUrl("https://git.xmcraft.cn/Xiameng/PCL-DreamPort"));
     }
 

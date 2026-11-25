@@ -10,7 +10,7 @@ namespace DreamPort.Core.Config;
 public static class DreamPortBuildConfig
 {
     public const string DefaultBaseUrl = "https://xmcraft.cn";
-    public const string DefaultRepoUrl = "https://github.com/Xiameng/PCL-DreamPort";
+    public const string DefaultRepoUrl = "https://github.com/XiamengYaro/PCL-DreamPort";
     public const string DefaultUpdateMirrorBaseUrl = "https://dl.xmcraft.cn";
     public const string DisplayName = "PCL-梦港";
     public const string RepoName = "PCL-DreamPort";

@@ -214,7 +214,7 @@ public sealed class DreamPortHeartbeatAndUpdateTests
                 "0.1.0",
                 httpClient: httpMirrorOk,
                 mirrorBaseUrl: "https://dl.xmcraft.cn",
-                repoUrl: "https://github.com/Xiameng/PCL-DreamPort");
+                repoUrl: "https://github.com/XiamengYaro/PCL-DreamPort");
 
             Assert.IsTrue(res.HasUpdate);
             Assert.AreEqual("mirror", res.Source);
@@ -248,13 +248,13 @@ public sealed class DreamPortHeartbeatAndUpdateTests
                     {
                         name = "PCL-DreamPort-0.3.0-mac-arm64.zip",
                         size = 2048L,
-                        browser_download_url = "https://github.com/Xiameng/PCL-DreamPort/releases/download/v0.3.0/PCL-DreamPort-0.3.0-mac-arm64.zip"
+                        browser_download_url = "https://github.com/XiamengYaro/PCL-DreamPort/releases/download/v0.3.0/PCL-DreamPort-0.3.0-mac-arm64.zip"
                     },
                     new
                     {
                         name = "SHA256SUMS",
                         size = 128L,
-                        browser_download_url = "https://github.com/Xiameng/PCL-DreamPort/releases/download/v0.3.0/SHA256SUMS"
+                        browser_download_url = "https://github.com/XiamengYaro/PCL-DreamPort/releases/download/v0.3.0/SHA256SUMS"
                     }
                 }
             }
@@ -279,7 +279,7 @@ public sealed class DreamPortHeartbeatAndUpdateTests
                 "0.1.0",
                 httpClient: httpFallback,
                 mirrorBaseUrl: "https://dl.xmcraft.cn",
-                repoUrl: "https://github.com/Xiameng/PCL-DreamPort");
+                repoUrl: "https://github.com/XiamengYaro/PCL-DreamPort");
 
             Assert.IsTrue(res.HasUpdate);
             Assert.AreEqual("github", res.Source);
@@ -309,7 +309,7 @@ public sealed class DreamPortHeartbeatAndUpdateTests
                 "0.1.0",
                 httpClient: httpEmpty,
                 mirrorBaseUrl: "https://dl.xmcraft.cn",
-                repoUrl: "https://github.com/Xiameng/PCL-DreamPort");
+                repoUrl: "https://github.com/XiamengYaro/PCL-DreamPort");
 
             Assert.IsFalse(res.HasUpdate);
         }
@@ -330,7 +330,7 @@ public sealed class DreamPortHeartbeatAndUpdateTests
                     {
                         name = "PCL-DreamPort-0.4.0-beta.1-mac-x64.zip",
                         size = 1000L,
-                        browser_download_url = "https://github.com/Xiameng/PCL-DreamPort/releases/download/v0.4.0-beta.1/PCL-DreamPort-0.4.0-beta.1-mac-x64.zip"
+                        browser_download_url = "https://github.com/XiamengYaro/PCL-DreamPort/releases/download/v0.4.0-beta.1/PCL-DreamPort-0.4.0-beta.1-mac-x64.zip"
                     }
                 }
             },
@@ -347,7 +347,7 @@ public sealed class DreamPortHeartbeatAndUpdateTests
                     {
                         name = "PCL-DreamPort-0.3.5-mac-arm64.zip",
                         size = 1000L,
-                        browser_download_url = "https://github.com/Xiameng/PCL-DreamPort/releases/download/v0.3.5/PCL-DreamPort-0.3.5-mac-arm64.zip"
+                        browser_download_url = "https://github.com/XiamengYaro/PCL-DreamPort/releases/download/v0.3.5/PCL-DreamPort-0.3.5-mac-arm64.zip"
                     }
                 }
             }

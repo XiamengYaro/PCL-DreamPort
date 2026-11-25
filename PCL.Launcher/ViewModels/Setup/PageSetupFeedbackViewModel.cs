@@ -102,7 +102,7 @@ public partial class PageSetupFeedbackViewModel : ViewModelBase
             }
         }
 
-        return "https://api.github.com/repos/Xiameng/PCL-DreamPort/issues?state=all&sort=created&per_page=200";
+        return "https://api.github.com/repos/XiamengYaro/PCL-DreamPort/issues?state=all&sort=created&per_page=200";
     }
 
     public static List<FeedbackItem> FetchFeedbackList()

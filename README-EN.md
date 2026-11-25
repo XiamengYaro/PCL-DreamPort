@@ -50,7 +50,7 @@ PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.0-poc di
 | Environment Variable | Default | Description |
 |---|---|---|
 | `DP_BASE_URL` | `https://xmcraft.cn` | DreamPort site root URL |
-| `DP_REPO_URL` | `https://github.com/Xiameng/PCL-DreamPort` | Public repository URL |
+| `DP_REPO_URL` | `https://github.com/XiamengYaro/PCL-DreamPort` | Public repository URL |
 | `DP_UPDATE_MIRROR_URL` | `https://dl.xmcraft.cn` | Update mirror base URL (not used for game data downloads) |
 | `PCL_MS_CLIENT_ID` | (Required) | Azure Client ID for Microsoft login (build-time; `DP_MS_CLIENT_ID` in Debug) |
 

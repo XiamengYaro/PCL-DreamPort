@@ -146,7 +146,7 @@ priority: optional
 maintainer: DreamPort Contributors
 description: PCL-梦港 Minecraft launcher
 vendor: DreamPort
-homepage: https://github.com/Xiameng/PCL-DreamPort
+homepage: https://github.com/XiamengYaro/PCL-DreamPort
 license: Apache-2.0
 depends:
 $depends

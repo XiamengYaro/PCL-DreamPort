@@ -4,7 +4,7 @@
 
 ## 开始之前
 
-查看 [Issues](https://github.com/Xiameng/PCL-DreamPort/issues) 寻找可以参与的任务，或创建新 Issue 讨论你的想法。请勿将本分支的问题反馈到原版 PCL 或 PCL CE 仓库。
+查看 [Issues](https://github.com/XiamengYaro/PCL-DreamPort/issues) 寻找可以参与的任务，或创建新 Issue 讨论你的想法。请勿将本分支的问题反馈到原版 PCL 或 PCL CE 仓库。
 
 ## 贡献流程
 
@@ -23,7 +23,7 @@
 1. Fork 仓库并克隆到本地，切入 `dev` 分支：
 
    ```bash
-   git clone https://github.com/Xiameng/PCL-DreamPort.git
+   git clone https://github.com/XiamengYaro/PCL-DreamPort.git
    git checkout dev
    ```
 
@@ -45,4 +45,4 @@
    ```
 
 5. 使用 Conventional Commits 提交信息格式 `<type>(scope?): <subject>`（如 `feat`、`fix`、`refactor`、`docs`、`test`、`chore`）
-6. 创建指向 `Xiameng/PCL-DreamPort` 仓库 `dev` 分支的 Pull Request，附上修改说明与本地验证记录
+6. 创建指向 `XiamengYaro/PCL-DreamPort` 仓库 `dev` 分支的 Pull Request，附上修改说明与本地验证记录

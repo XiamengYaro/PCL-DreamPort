@@ -60,7 +60,7 @@ bash scripts/publish.sh linux-x64 Release dist
 | 环境变量 / 构建参数 | 默认值 | 说明 |
 |---|---|---|
 | `DP_BASE_URL` | `https://xmcraft.cn` | DreamPort 站点根地址 |
-| `DP_REPO_URL` | `https://github.com/Xiameng/PCL-DreamPort` | 开源仓库地址 |
+| `DP_REPO_URL` | `https://github.com/XiamengYaro/PCL-DreamPort` | 开源仓库地址 |
 | `DP_UPDATE_MIRROR_URL` | `https://dl.xmcraft.cn` | 更新等配套服务下载加速源（不用于游戏数据下载） |
 | `PCL_MS_CLIENT_ID` | （必填） | 自有 Azure 正版登录 Client ID（构建期注入；Debug 支持 `DP_MS_CLIENT_ID`） |
 

@@ -13,7 +13,7 @@ internal static class BuildProvenance
 {
     public const bool Enabled = false;
 
-    private const string ReleaseApiUrl = "https://api.github.com/repos/Xiameng/PCL-DreamPort/releases/tags/v";
+    private const string ReleaseApiUrl = "https://api.github.com/repos/XiamengYaro/PCL-DreamPort/releases/tags/v";
     private const string DigestPrefix = "sha256:";
 
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(8);
