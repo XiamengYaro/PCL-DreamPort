@@ -299,3 +299,9 @@ public sealed record DreamPortNotificationMarkReadResult(
     int Marked = 0,
     string? Message = null,
     DreamPortFailureReason? FailureReason = null);
+
+public sealed record DreamPortHeartbeatResult(
+    bool Ok,
+    int NextIntervalSec,
+    DreamPortFailureReason? FailureReason = null,
+    string? Message = null);

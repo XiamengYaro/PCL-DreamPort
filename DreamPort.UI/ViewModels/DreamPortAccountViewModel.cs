@@ -491,6 +491,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             IsLoggedIn = true;
             IsAdminAccount = saved.IsAdmin;
             LoggedInUsername = saved.Username ?? string.Empty;
+            DreamPortHeartbeatHost.EnsureStarted("session-verified");
 
             await RefreshAccountStateAsync(saved.IsAdmin, saved.IsTokenPersistent, showSuccessBanner: true);
         }
@@ -509,6 +510,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         IsBusy = true;
         try
         {
+            await DreamPortHeartbeatHost.StopAndNotifyOfflineAsync(TimeSpan.FromSeconds(1.5));
             await _api.LogoutAsync();
             _store.ClearToken(_api.BaseUrl);
             IsLoggedIn = false;
@@ -1509,6 +1511,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                         IsLoggedIn = true;
                         IsAdminAccount = saved.IsAdmin;
                         LoggedInUsername = saved.Username ?? string.Empty;
+                        DreamPortHeartbeatHost.EnsureStarted("login");
 
                         await RefreshAccountStateAsync(saved.IsAdmin, saved.IsTokenPersistent, showSuccessBanner: false, ct);
                         _onSessionOrSiteChanged?.Invoke();
@@ -1882,6 +1885,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             ClearWaitingState();
 
             var oldUrl = _api.BaseUrl;
+            await DreamPortHeartbeatHost.StopAndNotifyOfflineAsync(TimeSpan.FromSeconds(1.5));
             if (!string.IsNullOrEmpty(_api.CurrentToken))
             {
                 try

@@ -7,6 +7,7 @@ using DreamPort.Core.Api;
 using DreamPort.Core.Auth;
 using DreamPort.Core.Config;
 using DreamPort.Core.Services;
+using DreamPort.Core.Updates;
 using DreamPort.UI.Services;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
@@ -16,6 +17,7 @@ using PCL.Core.Platform;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
 using PCL.Core.Utils.OS;
+using PCL.Navigation;
 using PCL.UI;
 using PCL.UI.Controls;
 
@@ -58,6 +60,7 @@ public sealed class StartupEffects(
 
         Basics.RunInNewThread(ShowStartupDialogs, "StartupDialogs");
         _ = RunDreamPortStartupTasksAsync();
+        _ = CheckDreamPortUpdatesOnStartupAsync();
     }
 
     private void ApplyWindowOpacity()
@@ -349,6 +352,9 @@ public sealed class StartupEffects(
                 DreamPortShellBridge.PublishUnreadCount(unread.Unread);
 
             var profile = await profileTask.ConfigureAwait(false);
+            if (profile is not null)
+                DreamPortHeartbeatHost.EnsureStarted("startup");
+
             if (profile is not null
                 && string.Equals(profile.Status, "approved", StringComparison.OrdinalIgnoreCase))
             {
@@ -367,6 +373,64 @@ public sealed class StartupEffects(
         catch (Exception ex)
         {
             LogWrapper.Debug(ex, "DreamPort", "启动后台未读通知与自动签到任务跳过");
+        }
+    }
+
+    private static async Task CheckDreamPortUpdatesOnStartupAsync()
+    {
+        try
+        {
+            if (Config.Update.UpdateMode == LauncherAutoUpdateBehavior.Disable)
+                return;
+
+            var channel = Config.Update.UpdateChannel == UpdateChannel.Beta
+                ? DreamPortUpdateChannel.Beta
+                : DreamPortUpdateChannel.Stable;
+            var skippedStore = new DreamPortSkippedVersionStore();
+            var res = await DreamPortUpdateService.CheckForUpdateAsync(
+                channel,
+                DreamPortUpdateService.CurrentPlatformTag(),
+                LauncherCommon.VersionBaseName,
+                skippedStore).ConfigureAwait(false);
+
+            if (!res.HasUpdate || res.IsSkipped || string.IsNullOrWhiteSpace(res.LatestVersion))
+                return;
+
+            var sourceLabel = res.Source == "mirror" ? "梦港加速镜像" : "GitHub Release";
+            var notes = (res.Notes ?? string.Empty).Trim();
+            if (notes.Length > 400)
+                notes = notes[..400].TrimEnd() + "...";
+            var content = string.IsNullOrEmpty(notes)
+                ? $"发现新版本 {res.LatestVersion}（当前版本 {res.CurrentVersion}，来源：{sourceLabel}）。"
+                : $"发现新版本 {res.LatestVersion}（当前版本 {res.CurrentVersion}，来源：{sourceLabel}）。\n\n{notes}";
+
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var choice = await DialogService.Instance.ShowAsync(
+                    new TextDialogRequest
+                    {
+                        Title = "发现梦港启动器新版本",
+                        Content = content,
+                        Buttons = DialogButtons.From(
+                            DialogButton.Create("前往更新页"),
+                            DialogButton.Create("跳过此版本"),
+                            DialogButton.Create("稍后"))
+                    });
+
+                switch (choice.Button)
+                {
+                    case 1:
+                        PageRouter.Navigate(PageIds.Setup, SubPageIds.SetupUpdate);
+                        break;
+                    case 2:
+                        skippedStore.SkipVersion(channel, res.LatestVersion);
+                        break;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            LogWrapper.Debug(ex, "DreamPort", "启动后台检查客户端更新跳过");
         }
     }
 }

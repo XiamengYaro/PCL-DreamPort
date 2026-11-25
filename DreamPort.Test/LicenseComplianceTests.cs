@@ -192,7 +192,9 @@ public sealed class LicenseComplianceTests
         var targetFiles = new[]
         {
             Path.Combine(root, "PCL.Launcher.Core", "Updates", "UpdateManager.cs"),
+            Path.Combine(root, "PCL.Launcher.Core", "Updates", "DreamPortUpdateSource.cs"),
             Path.Combine(root, "PCL.Launcher.Core", "Updates", "AnnouncementService.cs"),
+            Path.Combine(root, "DreamPort.Core", "Updates", "DreamPortUpdateService.cs"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Setup", "PageSetupUpdate.axaml"),
             Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Setup", "PageSetupUpdate.axaml.cs"),
             Path.Combine(root, "PCL.Launcher", "ViewModels", "Setup", "PageSetupUpdateViewModel.cs"),
@@ -233,8 +235,10 @@ public sealed class LicenseComplianceTests
             }
         }
 
-        Assert.IsFalse(UpdateManager.HasConfiguredUpdateSource);
-        Assert.AreEqual(UpdateEnums.VersionStatus.Latest, UpdateManager.GetVersionStatus());
+        var updateManagerText = File.ReadAllText(Path.Combine(root, "PCL.Launcher.Core", "Updates", "UpdateManager.cs"), Encoding.UTF8);
+        Assert.IsTrue(updateManagerText.Contains("DreamPortUpdateSource", StringComparison.Ordinal));
+        Assert.IsTrue(UpdateManager.HasConfiguredUpdateSource);
+        Assert.IsEmpty(UpdateManager.remoteServer.GetAnnouncementList().Content);
 
         Assert.AreEqual(
             "https://api.github.com/repos/Xiameng/PCL-DreamPort/issues?state=all&sort=created&per_page=200",

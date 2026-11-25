@@ -54,6 +54,15 @@ public sealed class ExitFlow
                 LogWrapper.Debug(ex, "DreamPort", "退出时清理联机房间失败");
             }
 
+            try
+            {
+                await DreamPort.UI.Services.DreamPortHeartbeatHost.StopAndNotifyOfflineAsync(TimeSpan.FromSeconds(1.5));
+            }
+            catch (Exception ex)
+            {
+                LogWrapper.Debug(ex, "DreamPort", "退出时发送下线通知失败");
+            }
+
             if (UpdateManager.isUpdateWaitingRestart)
                 try
                 {

@@ -1758,6 +1758,67 @@ public sealed partial class DreamPortApiClient : IDisposable
             Message: "已获取配套模组清单");
     }
 
+    /// <summary>
+    /// 上报极简客户端在线心跳：仅发送客户端版本号、平台标签与进程启动时间戳（绝不包含模组/配置/路径/代理/硬件等诊断快照）。
+    /// </summary>
+    public async Task<DreamPortHeartbeatResult> SendMinimalHeartbeatAsync(
+        string clientVersion,
+        string platform,
+        long clientStartedAtMs,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return new DreamPortHeartbeatResult(false, 60, DreamPortFailureReason.Expired, "未登录");
+
+        var versionValue = string.IsNullOrWhiteSpace(clientVersion) ? DreamPortBuildConfig.AppVersion : clientVersion.Trim();
+        var platformValue = string.IsNullOrWhiteSpace(platform) ? GetPlatformTag() : platform.Trim();
+        var startedAt = clientStartedAtMs > 0 ? clientStartedAtMs : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var minimalSnapshot = JsonSerializer.Serialize(new
+        {
+            clientVersion = versionValue,
+            platform = platformValue,
+            clientStartedAt = startedAt
+        }, JsonOptions);
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            "/api/client/heartbeat",
+            new
+            {
+                snapshot = minimalSnapshot,
+                clientStartedAt = startedAt
+            },
+            auth: true,
+            timeout: TimeSpan.FromSeconds(10),
+            ct: ct).ConfigureAwait(false);
+
+        if (TryClassifyFailure(res, "发送心跳失败", out var reason, out var error))
+            return new DreamPortHeartbeatResult(false, 60, reason, error);
+
+        var data = UnwrapData(res.Body);
+        var nextInterval = Math.Clamp(GetInt(data, "nextIntervalSec") ?? 60, 15, 600);
+        return new DreamPortHeartbeatResult(true, nextInterval);
+    }
+
+    /// <summary>
+    /// 在登出或退出启动器时向站点发送主动下线通知（尽力而为，不读取或应用远端协助动作）。
+    /// </summary>
+    public async Task<bool> SendOfflineAsync(CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(_token))
+            return false;
+
+        var res = await SendAsync(
+            HttpMethod.Post,
+            "/api/client/offline",
+            new { },
+            auth: true,
+            timeout: TimeSpan.FromSeconds(2),
+            ct: ct).ConfigureAwait(false);
+
+        return !TryClassifyFailure(res, "下线通知失败", out _, out _);
+    }
+
     public void Dispose()
     {
         if (_ownsClient)

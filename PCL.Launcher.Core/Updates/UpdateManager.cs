@@ -12,7 +12,7 @@ public static class UpdateManager
 {
     public static bool isUpdateWaitingRestart;
 
-    public static UpdatesWrapperModel remoteServer = new([]);
+    public static UpdatesWrapperModel remoteServer = new([new DreamPortUpdateSource()]);
 
     public static bool HasConfiguredUpdateSource => remoteServer.IsAvailable();
 
