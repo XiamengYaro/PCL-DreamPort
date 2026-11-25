@@ -23,7 +23,7 @@ public sealed record DreamPortLobbyRoomItemVm(
     bool IsHardBlocked,
     ICommand JoinCommand)
 {
-    public string HeaderText => HostGone ? $"{Name}（房主暂离）" : Name;
+    public string HeaderText => HostGone ? $"{Name} · 房主暂离" : Name;
 
     public bool HasCompatibilityBadge => !string.IsNullOrWhiteSpace(CompatibilityBadge);
 
@@ -44,9 +44,9 @@ public sealed record DreamPortLobbyMemberItemVm(
     public bool CanUnkick => !IsHost && Kicked;
 
     public string HeaderText => IsHost
-        ? $"{PlayerName}（房主）"
+        ? $"{PlayerName} · 房主"
         : Kicked
-            ? $"{PlayerName}（已移出拉黑）"
+            ? $"{PlayerName} · 已移出拉黑"
             : PlayerName;
 
     public string MetaText => JoinedAtMs > 0
@@ -69,7 +69,7 @@ public sealed record DreamPortLobbyInviteItemVm(
 {
     public string HeaderText => IsIncoming
         ? $"{FromUser} 邀请你加入「{RoomDisplay}」"
-        : $"已邀请 {ToUser}（房码 {Code}）";
+        : $"已邀请 {ToUser}，房码 {Code}";
 
     public bool HasMessage => !string.IsNullOrWhiteSpace(Message);
 
@@ -114,7 +114,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
     [ObservableProperty] private DreamPortHintLevel _hintLevel = DreamPortHintLevel.Info;
     [ObservableProperty] private string _accountSummary = "未检查";
     [ObservableProperty] private string _relaySummary = "等待检测站点 /api/lobby/config 配置";
-    [ObservableProperty] private string _realtimeStatusText = "实时同步：未连接（进入页面或手动刷新）";
+    [ObservableProperty] private string _realtimeStatusText = "实时同步：未连接。进入页面或手动刷新";
     [ObservableProperty] private bool _isLoggedIn;
     [ObservableProperty] private string _currentUsername = string.Empty;
     [ObservableProperty] private bool _isRelayEnabled;
@@ -310,7 +310,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
                 FriendOptions.Clear();
                 NotifyCollectionStates();
                 RealtimeStatusText = "实时同步：未登录";
-                SetStatus("尚未登录梦港账号（仅可浏览下方公开大厅）；登录后可创建或加入房间。", DreamPortHintLevel.Warning);
+                SetStatus("尚未登录梦港账号。可浏览下方公开大厅；登录后可创建或加入房间。", DreamPortHintLevel.Warning);
                 return;
             }
 
@@ -331,13 +331,13 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
             }
 
             if (IsHosting)
-                SetStatus($"✓ 正在开房「{ActiveRoomName}」（房码：{ActiveRoomCode}）。", DreamPortHintLevel.Info);
+                SetStatus($"✓ 正在开房「{ActiveRoomName}」。房码：{ActiveRoomCode}", DreamPortHintLevel.Info);
             else if (IsGuest)
                 SetStatus($"✓ 已加入联机房间「{ActiveRoomName}」，本地直连地址：{GuestLocalAddress}", DreamPortHintLevel.Info);
             else if (HasStaleRoom)
-                SetStatus($"检测到未关闭的旧房间（{StaleRoomCode}），请先点击「关闭残留旧房」后再开新房。", DreamPortHintLevel.Warning);
+                SetStatus($"检测到未关闭的旧房间。房码：{StaleRoomCode}。请先关闭残留旧房后再开新房。", DreamPortHintLevel.Warning);
             else if (cfg is { Enabled: true })
-                SetStatus($"✓ 梦港联机中继已就绪（{cfg.RelayHost}:{cfg.RelayPort}）。", DreamPortHintLevel.Info);
+                SetStatus($"✓ 梦港联机中继已就绪。地址：{cfg.RelayHost}:{cfg.RelayPort}", DreamPortHintLevel.Info);
         }
         finally
         {
@@ -388,7 +388,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         var token = cts.Token;
         _detectCts = cts;
         IsDetectingPort = true;
-        SetStatus("正在监听局域网世界广播（224.0.2.60:4445，并支持游戏日志端口兜底，最多 15 秒）...", DreamPortHintLevel.Info);
+        SetStatus("正在监听局域网世界广播，最多等待 15 秒。", DreamPortHintLevel.Info);
 
         try
         {
@@ -444,7 +444,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         var localPort = DreamPortLanService.ParseLocalPort(LocalPortInput);
         if (localPort is null)
         {
-            SetStatus("请先点击「自动检测游戏端口」或输入有效的本地游戏端口（1-65535）。", DreamPortHintLevel.Error);
+            SetStatus("请先点击「自动检测游戏端口」或输入 1 至 65535 的本地游戏端口。", DreamPortHintLevel.Error);
             return;
         }
 
@@ -464,7 +464,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
             // 先探活本地游戏端口，避免建出服务端房间后才发现游戏未开局域网而留下陈旧房间
             if (!await DreamPortLanService.PingLocalPortAsync(localPort.Value, 1500))
             {
-                SetStatus($"本机 {localPort.Value} 端口暂不可连，请先在 Minecraft 中点击「对局域网开放」后再试。", DreamPortHintLevel.Error);
+                SetStatus($"本机 {localPort.Value} 端口暂不可连。请先在 Minecraft 中开启局域网后再试。", DreamPortHintLevel.Error);
                 return;
             }
 
@@ -516,7 +516,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
                     onGameAliveChanged: alive => DispatchUi(() =>
                         HostGamePortStatusText = alive
                             ? $"本地游戏端口 {localPort.Value} 运行正常"
-                            : $"警告：本地游戏端口 {localPort.Value} 已关闭（中继保留 120 秒宽限期）"));
+                            : $"警告：本地游戏端口 {localPort.Value} 已关闭。中继保留 120 秒宽限期。"));
             }
             catch (Exception ex)
             {
@@ -535,8 +535,8 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
             Members.Clear();
             NotifyCollectionStates();
             StartStatsTicker();
-            AddEventLog($"成功开房「{room.Name}」（房码 {room.Code}，本地端口 {localPort.Value}）");
-            SetStatus($"✓ 房间已开启！房码：{room.Code}（发送给好友或在公开大厅可见）", DreamPortHintLevel.Info);
+            AddEventLog($"成功开房「{room.Name}」。房码：{room.Code}，本地端口：{localPort.Value}");
+            SetStatus($"✓ 房间已开启。房码：{room.Code}", DreamPortHintLevel.Info);
 
             await Task.WhenAll(RefreshPublicRoomsCoreAsync(), RefreshFriendsCoreAsync(), RefreshInvitesCoreAsync());
         }
@@ -729,7 +729,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         var normalized = DreamPortApiClient.NormalizeRoomCode(rawCode);
         if (!DreamPortApiClient.IsValidRoomCodeFormat(normalized))
         {
-            SetStatus("房间码格式无效，应为 8 位数字/大写字母组合（不含 I/O/L/U）。", DreamPortHintLevel.Error);
+            SetStatus("房间码格式无效。请输入 8 位数字或大写字母，不含 I/O/L/U。", DreamPortHintLevel.Error);
             return;
         }
 
@@ -852,7 +852,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
 
         if (cfg is null)
         {
-            SetStatus("未能从站点获取联机中继节点配置（/api/lobby/config）。", DreamPortHintLevel.Error);
+            SetStatus("未能从站点获取联机中继配置。", DreamPortHintLevel.Error);
             return null;
         }
 
@@ -901,7 +901,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         {
             var room = item.Room;
             var compat = item.Compat;
-            var occ = room.Occupancy is { } n ? $"{n}/{room.MaxPlayers} 人" : $"人数未知（上限 {room.MaxPlayers} 人）";
+            var occ = room.Occupancy is { } n ? $"{n}/{room.MaxPlayers} 人" : $"人数未知，上限 {room.MaxPlayers} 人";
             var ver = string.IsNullOrWhiteSpace(room.McVersion) ? "全版本" : room.McVersion;
             var loader = string.IsNullOrWhiteSpace(room.ModLoader)
                 || string.Equals(room.ModLoader, "vanilla", StringComparison.OrdinalIgnoreCase)
@@ -925,7 +925,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
 
         PublicRoomsSummaryText = PublicRooms.Count == 0
             ? "当前没有公开联机房间，你可以创建房间或通过房码加入好友。"
-            : $"当前共有 {PublicRooms.Count} 个公开房间可加入（已按实例兼容度排序）。";
+            : $"当前共有 {PublicRooms.Count} 个公开房间可加入。已按实例兼容度排序。";
         OnPropertyChanged(nameof(HasPublicRooms));
         OnPropertyChanged(nameof(HasNoPublicRooms));
     }
@@ -937,7 +937,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         {
             HasStaleRoom = true;
             StaleRoomCode = room.Code;
-            StaleRoomSummary = $"检测到你还有一个未关闭的房间「{room.Name}」（房码：{room.Code}），每人同时只能开启 1 个房间。";
+            StaleRoomSummary = $"检测到你还有一个未关闭的房间「{room.Name}」。房码：{room.Code}。每人同时只能开启 1 个房间。";
         }
         else
         {
@@ -1252,7 +1252,7 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
         IsLoggedIn = !string.IsNullOrEmpty(saved.Token);
         CurrentUsername = saved.Username ?? string.Empty;
         AccountSummary = IsLoggedIn
-            ? $"站点地址：{saved.BaseUrl} | 当前账号：{CurrentUsername}（{(saved.IsAdmin ? "管理员" : "已登录玩家")}）"
+            ? $"站点地址：{saved.BaseUrl} | 当前账号：{CurrentUsername}，{(saved.IsAdmin ? "管理员" : "已登录玩家")}"
             : $"站点地址：{saved.BaseUrl} | 当前状态：未登录";
 
         if (siteChanged || tokenChanged)
@@ -1315,8 +1315,8 @@ public partial class DreamPortLobbyViewModel : ObservableObject, IAsyncDisposabl
                 OnRealtimeChanged,
                 connected => DispatchUi(() =>
                     RealtimeStatusText = connected
-                        ? "实时同步：在线（WebSocket 秒级刷新）"
-                        : "实时同步：重连中（30 秒轮询兜底）"),
+                        ? "实时同步：在线，WebSocket 秒级刷新"
+                        : "实时同步：重连中，30 秒轮询兜底"),
                 msg => DispatchUi(() => AddEventLog(msg)));
             _realtimeClient.Start();
             RealtimeStatusText = "实时同步：正在建立 WebSocket 连接...";

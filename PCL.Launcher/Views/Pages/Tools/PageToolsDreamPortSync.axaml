@@ -17,7 +17,7 @@
 
             <!-- 1. 服务器配套模组同步 -->
             <ui:MyCard Margin="0,15"
-                       Title="服务器配套模组同步（双源清单 + 兼容性硬拦截）">
+                       Title="服务器配套模组同步">
                 <StackPanel Margin="25,40,25,20"
                             Spacing="12">
                     <TextBlock TextWrapping="Wrap"
@@ -137,7 +137,7 @@
             <!-- 2. 存档云备份 -->
             <ui:MyCard Margin="0,0,0,15"
                        CanSwap="True"
-                       Title="存档云备份（分块断点续传 + SHA-256 校验）">
+                       Title="存档云备份">
                 <StackPanel Margin="25,40,25,20"
                             Spacing="12">
                     <TextBlock TextWrapping="Wrap"
@@ -154,11 +154,11 @@
                           ColumnSpacing="10">
                         <ui:MyTextBox Grid.Column="0"
                                       IsEnabled="{Binding CanOperatePhase5}"
-                                      HintText="可选：上传展示名称（留空用原存档名）"
+                                      HintText="上传名称，留空则使用原存档名"
                                       Text="{Binding CloudSaveDisplayName, Mode=TwoWay}" />
                         <ui:MyTextBox Grid.Column="1"
                                       IsEnabled="{Binding CanOperatePhase5}"
-                                      HintText="可选：备份备注（如：下矿前存档）"
+                                      HintText="备份备注，可不填"
                                       Text="{Binding CloudSaveNote, Mode=TwoWay}" />
                     </Grid>
 
@@ -180,7 +180,7 @@
 
                     <StackPanel Spacing="6">
                         <TextBlock FontWeight="SemiBold"
-                                   Text="当前实例本地世界（上传时自动跳过 session.lock）" />
+                                   Text="当前实例本地世界" />
                         <TextBlock IsVisible="{Binding HasNoLocalWorlds}"
                                    FontSize="12"
                                    Foreground="{DynamicResource ColorBrushGray4}"
@@ -219,7 +219,7 @@
 
                     <StackPanel Spacing="6">
                         <TextBlock FontWeight="SemiBold"
-                                   Text="云端备份记录（恢复自动防覆盖 + Zip-Slip 拦截）" />
+                                   Text="云端备份记录" />
                         <TextBlock IsVisible="{Binding HasNoCloudBackups}"
                                    FontSize="12"
                                    Foreground="{DynamicResource ColorBrushGray4}"
@@ -273,7 +273,7 @@
             <!-- 3. 多设备白名单配置云同步 -->
             <ui:MyCard Margin="0,0,0,15"
                        CanSwap="True"
-                       Title="多设备白名单配置云同步（乐观锁防静默覆盖）">
+                       Title="配置云同步">
                 <StackPanel Margin="25,40,25,20"
                             Spacing="12">
                     <TextBlock TextWrapping="Wrap"
@@ -281,7 +281,7 @@
                     <TextBlock FontSize="12"
                                Foreground="{DynamicResource ColorBrushGray4}"
                                TextWrapping="Wrap"
-                               Text="隐私约束：仅同步更新频道、下载并发、窗口大小、字体、语言与四款蓝色主题等可移植配置；账号凭据、MirrorChyan Key、代理帐密、Java 本机路径与自定义启动参数永不上传。" />
+                               Text="云同步仅包含界面、启动与下载偏好，不会上传账号凭据、密钥、代理密码、Java 路径或启动参数。" />
 
                     <ui:MyHint IsVisible="{Binding HasProfileConflict}"
                                Theme="Yellow"

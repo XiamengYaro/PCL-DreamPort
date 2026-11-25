@@ -89,7 +89,7 @@
                         <TextBlock IsVisible="{Binding !HasMembers}"
                                    FontSize="12"
                                    Foreground="{DynamicResource ColorBrushGray4}"
-                                   Text="正在等待好友或大厅访客加入（成员同步后可在此踢出/解除拉黑）。" />
+                                   Text="正在等待好友或大厅访客加入。" />
                         <ItemsControl IsVisible="{Binding HasMembers}"
                                       ItemsSource="{Binding Members}">
                             <ItemsControl.ItemTemplate>
@@ -178,7 +178,7 @@
                                               Text="{Binding InviteFriendUsernameInput, Mode=TwoWay}" />
                                 <ui:MyTextBox Grid.Column="1"
                                               MinWidth="150"
-                                              HintText="附言（可选）"
+                                              HintText="附言，可不填"
                                               Text="{Binding InviteMessageInput, Mode=TwoWay}" />
                                 <ui:MyButton Grid.Column="2"
                                              MinWidth="96"
@@ -291,7 +291,7 @@
                                    VerticalAlignment="Center"
                                    Text="房间名称" />
                         <ui:MyTextBox Grid.Column="1"
-                                      HintText="留空自动生成（最多 24 字）"
+                                      HintText="留空自动生成，最多 24 字"
                                       IsEnabled="{Binding IsNotBusy}"
                                       Text="{Binding RoomNameInput, Mode=TwoWay}" />
                         <TextBlock Grid.Column="2"
@@ -310,7 +310,7 @@
                                    VerticalAlignment="Center"
                                    Text="游戏端口" />
                         <ui:MyTextBox Grid.Column="1"
-                                      HintText="例如 25565（或点击右侧自动检测）"
+                                      HintText="例如 25565"
                                       IsEnabled="{Binding IsNotBusy}"
                                       Text="{Binding LocalPortInput, Mode=TwoWay}" />
                         <ui:MyButton Grid.Column="2"
@@ -367,7 +367,7 @@
                                    VerticalAlignment="Center"
                                    Text="房间码" />
                         <ui:MyTextBox Grid.Column="1"
-                                      HintText="输入 8 位房间码（不区分大小写）"
+                                      HintText="输入 8 位房间码"
                                       IsEnabled="{Binding IsNotBusy}"
                                       Text="{Binding JoinRoomCodeInput, Mode=TwoWay}" />
                         <TextBlock Grid.Column="2"

@@ -233,7 +233,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 
         if (!string.IsNullOrEmpty(saved.Username) && !saved.IsTokenPersistent)
         {
-            SetStatus("上次登录凭据未持久保存（系统加密存储不可用），请通过浏览器重新授权登录。", DreamPortHintLevel.Warning);
+            SetStatus("上次登录凭据未能安全保存，请通过浏览器重新授权登录。", DreamPortHintLevel.Warning);
         }
 
         await ProbeConfigAsync();
@@ -288,7 +288,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             return;
         if (!IsApprovedPlayer)
         {
-            SetStatus("完成入服白名单审核后即可每日签到领取积分。", DreamPortHintLevel.Warning);
+            SetStatus("完成入服审核后即可每日签到领取积分。", DreamPortHintLevel.Warning);
             return;
         }
 
@@ -310,7 +310,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 
             if (res.First)
             {
-                var pts = res.PointsAwarded > 0 ? $"（+{res.PointsAwarded} 积分）" : "";
+                var pts = res.PointsAwarded > 0 ? $"，+{res.PointsAwarded} 积分" : "";
                 SetStatus($"✓ {res.Message}{pts}", DreamPortHintLevel.Info);
             }
             else
@@ -432,7 +432,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         var browserOpened = TryOpenBrowser(session.ConfirmUrl);
         SetStatus(
             browserOpened
-                ? "已打开系统浏览器授权页，请在浏览器中登录并点击「确认登录」（也可使用已登录的手机扫码）。"
+                ? "已打开浏览器授权页。请登录并点击「确认登录」，也可使用手机扫码确认。"
                 : "未能自动打开浏览器，请复制下方授权链接到浏览器中打开，或用手机扫码确认。",
             DreamPortHintLevel.Info);
 
@@ -479,7 +479,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             {
                 if (valid.Reason == DreamPortFailureReason.Network)
                 {
-                    SetStatus($"网络不可达：{valid.Message ?? "请检查网络"}（已保留本地登录状态）", DreamPortHintLevel.Error);
+                    SetStatus($"网络不可达：{valid.Message ?? "请检查网络"}。已保留本地登录状态。", DreamPortHintLevel.Error);
                     return;
                 }
 
@@ -563,7 +563,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 
         if (!CanManageSessions)
         {
-            SetStatus("账号通过白名单审核后才能踢出其他设备（当前可直接使用本页的退出登录）。", DreamPortHintLevel.Warning);
+            SetStatus("账号通过入服审核后才能管理其他设备。当前仍可使用本页的退出登录。", DreamPortHintLevel.Warning);
             return;
         }
 
@@ -597,7 +597,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
     {
         if (!CanManageSessions)
         {
-            SetStatus("账号通过白名单审核后才能批量管理其他登录设备。", DreamPortHintLevel.Warning);
+            SetStatus("账号通过入服审核后才能管理其他登录设备。", DreamPortHintLevel.Warning);
             return;
         }
 
@@ -741,7 +741,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            var who = string.IsNullOrWhiteSpace(playerName) ? "" : $"（角色 {playerName}）";
+            var who = string.IsNullOrWhiteSpace(playerName) ? "" : $"，角色：{playerName}";
             SetStatus($"✓ {res.Message}{who}", DreamPortHintLevel.Info);
             await RefreshAccountStateAsync(IsAdminAccount, _store.Load().IsTokenPersistent, showSuccessBanner: false);
         }
@@ -788,7 +788,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         MsaVerificationUri = string.IsNullOrWhiteSpace(start.VerificationUri)
             ? "https://www.microsoft.com/link"
             : start.VerificationUri;
-        MsaWaitHint = $"请在浏览器中输入设备码 {start.UserCode} 完成微软登录（约 {Math.Max(1, start.ExpiresInSec / 60)} 分钟有效）";
+        MsaWaitHint = $"请在浏览器中输入设备码 {start.UserCode}。设备码约 {Math.Max(1, start.ExpiresInSec / 60)} 分钟内有效。";
         IsWaitingMsaVerify = true;
         TryOpenBrowser(MsaVerificationUri);
         SetStatus("已发起微软设备码正版验证，请在打开的微软页面输入设备码完成确认。", DreamPortHintLevel.Info);
@@ -913,9 +913,9 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                     options: q.Options));
             }
 
-            QuestionnaireHintText = $"及格线：{cfg.PassScore} 分（满分按题库总分百分比折算） · 共 {cfg.Questions.Count} 题";
+            QuestionnaireHintText = $"及格线：{cfg.PassScore} 分 · 共 {cfg.Questions.Count} 题";
             OnPropertyChanged(nameof(HasQuestionnaireQuestions));
-            SetStatus($"已加载入服问卷（共 {cfg.Questions.Count} 题），完成后点击提交将实时展示 AI 评分。", DreamPortHintLevel.Info);
+            SetStatus($"已加载入服问卷，共 {cfg.Questions.Count} 题。完成后可查看 AI 评分。", DreamPortHintLevel.Info);
         }
         finally
         {
@@ -967,7 +967,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                 {
                     ScoreFeedbacks.Add(new DreamPortScoreFeedbackVm(
                         HeaderText: $"第 {ev.Index + 1}/{Math.Max(1, ev.Total)} 题 · {ev.QuestionText}",
-                        ScoreText: $"得分 {ev.Score}/{ev.MaxScore}（累计 {ev.TotalScore}/{ev.MaxScoreTotal}）",
+                        ScoreText: $"单题 {ev.Score}/{ev.MaxScore}，累计 {ev.TotalScore}/{ev.MaxScoreTotal}",
                         ReasonText: string.IsNullOrWhiteSpace(ev.Reason) ? "已完成评分" : ev.Reason));
                     OnPropertyChanged(nameof(HasScoreFeedbacks));
                 }),
@@ -991,8 +991,8 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             QuestionnaireSummaryText = $"{statusTag} · 得分 {outcome.TotalScore}/{outcome.MaxScore}\n{outcome.Summary}".Trim();
             SetStatus(
                 outcome.Passed
-                    ? $"✓ 问卷提交成功（{outcome.TotalScore}/{outcome.MaxScore} 分，已通过）！"
-                    : $"问卷已提交（{outcome.TotalScore}/{outcome.MaxScore} 分，未及格，可查看评语或修改后重交）。",
+                    ? $"✓ 问卷提交成功，{outcome.TotalScore}/{outcome.MaxScore} 分，已通过。"
+                    : $"问卷已提交，{outcome.TotalScore}/{outcome.MaxScore} 分，未及格。可查看评语或修改后重交。",
                 outcome.Passed ? DreamPortHintLevel.Info : DreamPortHintLevel.Warning);
 
             await RefreshAccountStateAsync(IsAdminAccount, _store.Load().IsTokenPersistent, showSuccessBanner: false);
@@ -1159,7 +1159,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             ResetRewardsAndTitlesState();
             DreamPortShellBridge.ResetUnreadCount();
             if (showSuccessBanner)
-                SetStatus("✓ 已连接 DreamPort 站点（管理员身份）。", DreamPortHintLevel.Info);
+                SetStatus("✓ 已连接 DreamPort，管理员身份。", DreamPortHintLevel.Info);
             return;
         }
 
@@ -1243,8 +1243,8 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                 {
                     var pendingHint = string.IsNullOrWhiteSpace(qq.Status.PendingQq)
                         ? ""
-                        : $"（注册预填：{qq.Status.PendingQq}，仍需群内取码验证）";
-                    QqStatusSummary = $"未绑定 QQ{pendingHint}。请在 QQ 群发送「/dp 绑定」，再把机器人私聊给你的验证码填到下方。";
+                        : $"注册时预填 QQ：{qq.Status.PendingQq}，仍需验证。";
+                    QqStatusSummary = $"未绑定 QQ。{pendingHint}请在 QQ 群发送「/dp 绑定」，再把机器人私聊给你的验证码填到下方。";
                 }
             }
 
@@ -1303,9 +1303,10 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         IsBanned = progress.Banned;
         BanDetailText = progress.Banned
             ? $"封禁原因：{progress.BanReason ?? "违反服务器规则"}"
+              + "\n"
               + (progress.BanUntilMs is { } until && until > 0
-                  ? $"（截止：{DateTimeOffset.FromUnixTimeMilliseconds(until).ToLocalTime():yyyy-MM-dd HH:mm}）"
-                  : "（永久封禁）")
+                  ? $"封禁至 {DateTimeOffset.FromUnixTimeMilliseconds(until).ToLocalTime():yyyy-MM-dd HH:mm}"
+                  : "永久封禁")
             : string.Empty;
 
         IsRejected = progress.Rejected;
@@ -1381,8 +1382,8 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         SessionsSummaryText = active.Count == 0
             ? "当前没有活跃设备会话记录。"
             : CanManageSessions
-                ? $"当前共有 {active.Count} 台活跃登录设备（支持单设备踢下线或踢除其它设备）。"
-                : $"当前共有 {active.Count} 台活跃登录设备（完成入服审核后可踢除其他设备）。";
+                ? $"当前共有 {active.Count} 台活跃登录设备。"
+                : $"当前共有 {active.Count} 台活跃登录设备。完成入服审核后可管理其他设备。";
     }
 
     private void RefreshActiveMcProfileHint()
@@ -1391,7 +1392,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         ActiveMcProfileName = name ?? string.Empty;
         ActiveMcProfileHint = string.IsNullOrWhiteSpace(name)
             ? "当前未选定微软正版档案。请先前往「启动」页登录微软正版账号。"
-            : $"当前启动器已登录微软正版角色：{name}（可直接一键提交验证）";
+            : $"当前启动器已登录微软正版角色：{name}。可直接提交验证。";
     }
 
     private async Task PollMsaVerifyLoopAsync(string flowId, int intervalSec, CancellationTokenSource cts)
@@ -1426,7 +1427,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                             HandleSessionExpired(poll.Message ?? "登录已过期，请重新登录。");
                             return;
                         }
-                        SetStatus(poll.Message ?? $"微软设备码验证结束（{poll.Status}）。", DreamPortHintLevel.Error);
+                        SetStatus(poll.Message ?? "微软设备码验证未完成，请重试。", DreamPortHintLevel.Error);
                         return;
 
                     case "network":
@@ -1494,7 +1495,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() >= session.ExpiresAtMs)
             {
                 ClearWaitingState();
-                SetStatus("登录授权已超时（5 分钟有效），请重新点击「在浏览器中登录」。", DreamPortHintLevel.Error);
+                SetStatus("登录授权已超时，请重新点击「在浏览器中登录」。", DreamPortHintLevel.Error);
                 return;
             }
 
@@ -1581,7 +1582,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         var remainingMs = expiresAtMs - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         if (remainingMs <= 0)
         {
-            CountdownText = "剩余 00:00（即将超时）";
+            CountdownText = "即将超时";
             return;
         }
 
@@ -1597,7 +1598,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             var cfg = await _api.GetConfigAsync();
             if (cfg is null)
             {
-                SetStatus($"未能获取站点配置（{_api.BaseUrl}），仅可离线使用基础功能。", DreamPortHintLevel.Warning);
+                SetStatus("未能获取站点配置，仅可离线使用基础功能。", DreamPortHintLevel.Warning);
                 return;
             }
 
@@ -1621,7 +1622,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         var url = normalized + relativePath;
         var ok = TryOpenBrowser(url);
         SetStatus(
-            ok ? $"已在系统浏览器打开{label}页面（{url}）。" : $"无法自动打开浏览器，请手动访问：{url}",
+            ok ? $"已在浏览器打开{label}。地址：{url}" : $"无法自动打开浏览器，请手动访问：{url}",
             ok ? DreamPortHintLevel.Info : DreamPortHintLevel.Warning);
     }
 
@@ -1857,7 +1858,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                 ? "未佩戴称号"
                 : _equippedTitleCode;
         var achievementSuffix = titles.TotalAchievements > 0
-            ? $"（成就 {titles.CompletedAchievements}/{titles.TotalAchievements} · 未解锁 {titles.LockedCount} 个）"
+            ? $" · 成就 {titles.CompletedAchievements}/{titles.TotalAchievements}，未解锁 {titles.LockedCount} 个"
             : "";
         EquippedTitleText = $"{equippedLabel}{achievementSuffix}";
 

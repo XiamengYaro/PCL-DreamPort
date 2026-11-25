@@ -166,7 +166,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private string _statusHint = "点击「检查配套模组」获取服务端最新配套资源与兼容要求。";
     [ObservableProperty] private DreamPortHintLevel _hintLevel = DreamPortHintLevel.Info;
     [ObservableProperty] private string _selectedInstanceSummary = "未选择 Minecraft 实例";
-    [ObservableProperty] private string _serverPackSummary = "尚未检查服务端配套模组清单（GET /api/client/serverpack）";
+    [ObservableProperty] private string _serverPackSummary = "尚未检查服务器配套模组。";
     [ObservableProperty] private string _compatibilitySummary = string.Empty;
     [ObservableProperty] private bool _isCompatible;
     [ObservableProperty] private bool _hasCompatibilityWarning;
@@ -182,7 +182,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
     [ObservableProperty] private bool _isCloudSaveRunning;
 
     // Profile Sync state
-    [ObservableProperty] private string _profileSyncSummary = "登录后可查看多设备白名单配置云同步状态（仅同步界面/启动/下载等便携偏好，不同步令牌、Java 路径与代理帐密）。";
+    [ObservableProperty] private string _profileSyncSummary = "登录后可查看配置云同步状态。";
     [ObservableProperty] private string _profileConflictSummary = string.Empty;
     [ObservableProperty] private bool _hasProfileConflict;
 
@@ -418,7 +418,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
             {
                 IsCompatible = false;
                 HasCompatibilityWarning = true;
-                CompatibilitySummary = $"检测到 {plan.Rejected.Count} 条不安全清单路径（{string.Join("、", plan.Rejected.Take(3))}），已整单拒绝。";
+                CompatibilitySummary = $"检测到 {plan.Rejected.Count} 条不安全的清单路径，已拒绝同步。涉及：{string.Join("、", plan.Rejected.Take(3))}";
                 SetStatus(CompatibilitySummary, DreamPortHintLevel.Error);
                 NotifyCollectionStates();
                 return;
@@ -432,7 +432,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
 
             foreach (var del in plan.Deletes)
             {
-                PendingFileActions.Add(new DreamPortServerPackFileItemVm("清理移除", del, "服务端清单已移除（仅清理受管文件）"));
+                PendingFileActions.Add(new DreamPortServerPackFileItemVm("清理移除", del, "服务端清单已移除，仅清理受管文件。"));
             }
 
             foreach (var skip in plan.SkippedDisabled)
@@ -477,7 +477,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
 
             var pendingMrCount = ModrinthItems.Count(m => m.StatusLabel == "待安装");
             if (plan.Downloads.Count == 0 && plan.Deletes.Count == 0 && pendingMrCount == 0)
-                SetStatus($"✓ 当前实例与服务端配套模组已完全一致（已是最新：{plan.UpToDateCount} 个直传文件）。", DreamPortHintLevel.Info);
+                SetStatus($"✓ 当前实例与服务器配套模组已完全一致，{plan.UpToDateCount} 个直传文件均为最新。", DreamPortHintLevel.Info);
             else
                 SetStatus($"✓ 检查完成：待下载/更新 {plan.Downloads.Count} 项、清理 {plan.Deletes.Count} 项、Modrinth 待安装 {pendingMrCount} 项，可点击「开始同步」。", DreamPortHintLevel.Info);
 
@@ -551,7 +551,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
             }
             else
             {
-                var detail = res.Failed.Count > 0 ? $"（{string.Join("；", res.Failed.Take(3))}）" : string.Empty;
+                var detail = res.Failed.Count > 0 ? $"。失败项：{string.Join("；", res.Failed.Take(3))}" : string.Empty;
                 SetStatus($"{res.Message}{detail}", DreamPortHintLevel.Error);
             }
         }
@@ -857,8 +857,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
                 var remoteUpdated = res.ConflictRemoteUpdatedAtMs is > 0
                     ? DateTimeOffset.FromUnixTimeMilliseconds(res.ConflictRemoteUpdatedAtMs.Value).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
                     : "未知时间";
-                var verNote = string.IsNullOrWhiteSpace(res.ConflictClientVersion) ? string.Empty : $"（客户端 {res.ConflictClientVersion}）";
-                ProfileConflictSummary = $"检测到云端配置版本冲突：云端已被另一台设备更新至 Revision {res.ConflictRemoteRevision ?? 0}{verNote}（更新时间 {remoteUpdated}）。请选择「拉取云端覆盖本机」或「强制用本机覆盖云端」。";
+                ProfileConflictSummary = $"云端配置已被另一台设备更新，最后更新时间为 {remoteUpdated}。请选择「拉取云端覆盖本机」或「强制用本机覆盖云端」。";
                 SetStatus(res.Message ?? "云端配置版本冲突，请手动选择合并方向。", DreamPortHintLevel.Warning);
                 return;
             }
@@ -972,7 +971,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
         }
 
         var quotaLabel = status.DailyPerUser > 0 ? $"每账号每日 {status.DailyPerUser} 次" : "不限次数";
-        LogDiagnoseStatusSummary = $"AI 日志诊断服务已启用（{quotaLabel}；登录即可使用，发送前自动脱敏玩家名/用户目录/令牌）。";
+        LogDiagnoseStatusSummary = $"AI 日志诊断已启用。{quotaLabel}，登录后可用；提交前会自动脱敏。";
     }
 
     private bool TryPrepareLogDiagnose()
@@ -1013,8 +1012,8 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
         var payload = DreamPortLogDiagnoseService.BuildPayload(input);
         _preparedDiagnosePayload = payload;
         var crashLabel = string.IsNullOrWhiteSpace(payload.CrashReportName) ? "无崩溃报告" : $"含崩溃报告 {payload.CrashReportName}";
-        var truncLabel = payload.Truncated ? "（已按预算裁剪末尾关键片段）" : "（完整片段）";
-        LogDiagnosePreviewSummary = $"已生成脱敏日志：{payload.CharCount} 字符，{crashLabel}{truncLabel}。上下文仅包含实例版本、加载器与模组数量，不含文件路径与登录凭据。";
+        var trimLabel = payload.Truncated ? "已截取关键片段。" : "保留完整片段。";
+        LogDiagnosePreviewSummary = $"已准备日志：{payload.CharCount} 字符，{crashLabel}。内容已脱敏，{trimLabel}";
         return true;
     }
 
@@ -1040,7 +1039,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
         IsBusy = true;
         LogDiagnoseItems.Clear();
         LogDiagnoseAskForText = string.Empty;
-        LogDiagnoseResultSummary = "正在提交脱敏日志并等待 AI 分析...";
+        LogDiagnoseResultSummary = "正在提交日志并等待诊断结果...";
 
         DreamPortLogDiagnoseExecutionResult res;
         try
@@ -1071,13 +1070,12 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
         var header = string.Equals(verdict.Verdict, "likely_cause", StringComparison.OrdinalIgnoreCase)
             ? "定位结论：已发现可能原因"
             : "定位结论：日志信息不足，建议结合本地诊断或补充更多信息";
-        var tokenNote = res.TotalTokens > 0 ? $"（耗时 {res.LatencyMs} ms，{res.TotalTokens} tokens）" : string.Empty;
-        LogDiagnoseResultSummary = $"{header}{tokenNote}\n{verdict.Summary}";
+        LogDiagnoseResultSummary = $"{header}\n{verdict.Summary}";
 
         foreach (var item in verdict.Items)
         {
             LogDiagnoseItems.Add(new DreamPortLogDiagnoseItemVm(
-                HeaderText: $"{item.Title}（置信度 {Math.Round(item.Confidence * 100)}%）",
+                HeaderText: item.Title,
                 EvidenceText: string.IsNullOrWhiteSpace(item.Evidence) ? string.Empty : $"依据：{item.Evidence}",
                 AdviceText: $"建议：{item.Advice}"));
         }
@@ -1086,7 +1084,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
             LogDiagnoseAskForText = "可补充信息：\n" + string.Join("\n", verdict.AskFor.Select(a => $"- {a}"));
 
         OnPropertyChanged(nameof(HasLogDiagnoseItems));
-        SetStatus("✓ AI 日志诊断完成，结论已保留在当前卡片。", DreamPortHintLevel.Info);
+        SetStatus("✓ AI 日志诊断完成。", DreamPortHintLevel.Info);
     }
 
     [RelayCommand]
@@ -1125,7 +1123,7 @@ public partial class DreamPortSyncViewModel : ObservableObject, IAsyncDisposable
         var remoteTime = status.RemoteUpdatedAtMs is > 0
             ? DateTimeOffset.FromUnixTimeMilliseconds(status.RemoteUpdatedAtMs.Value).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
             : "尚未上传";
-        ProfileSyncSummary = $"云端 Revision：{status.RemoteRevision} | 本机基线 Revision：{status.LocalRevision} | 状态：{dirtyLabel} | 最近云端更新：{remoteTime} | 上限：{FormatBytes(status.MaxBytes)}";
+        ProfileSyncSummary = $"状态：{dirtyLabel}。最近云端更新：{remoteTime}。上限：{FormatBytes(status.MaxBytes)}。";
     }
 
     private IReadOnlyList<string> CollectKnownIdentities()

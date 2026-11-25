@@ -174,7 +174,7 @@ public partial class DreamPortCommunityViewModel : ObservableObject, IDisposable
             AnnouncementsSummaryText = Announcements.Count == 0
                 ? "当前暂无已发布的服务器公告。"
                 : $"已加载 {Announcements.Count} 条服务器公告。";
-            SetStatus($"✓ 已同步最新公告（{Announcements.Count} 条）。", DreamPortHintLevel.Info);
+            SetStatus($"✓ 已同步最新公告，共 {Announcements.Count} 条。", DreamPortHintLevel.Info);
         }
         finally
         {
@@ -352,7 +352,7 @@ public partial class DreamPortCommunityViewModel : ObservableObject, IDisposable
         try
         {
             _openUrl(url);
-            SetStatus($"已在浏览器打开通知关联页面（{url}）。", DreamPortHintLevel.Info);
+            SetStatus($"已在浏览器打开通知关联页面。地址：{url}", DreamPortHintLevel.Info);
         }
         catch
         {
@@ -421,7 +421,7 @@ public partial class DreamPortCommunityViewModel : ObservableObject, IDisposable
         try
         {
             _openUrl(url);
-            SetStatus($"已在浏览器打开{label}（{url}）。", DreamPortHintLevel.Info);
+            SetStatus($"已在浏览器打开{label}。地址：{url}", DreamPortHintLevel.Info);
         }
         catch
         {

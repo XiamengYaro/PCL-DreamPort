@@ -20,7 +20,7 @@
                 <StackPanel Margin="25,40,25,20"
                             Spacing="12">
                     <TextBlock TextWrapping="Wrap"
-                               Text="点击下方按钮将打开 DreamPort 网页端进行安全授权确认（原生支持通行密钥、两步验证、图形验证码、账号注册与封禁说明；启动器不采集明文密码）。" />
+                               Text="使用浏览器完成 DreamPort 安全授权登录。启动器不会读取或保存你的密码。" />
                     <StackPanel Orientation="Horizontal"
                                 Spacing="12">
                         <ui:MyButton MinWidth="150"
@@ -233,7 +233,7 @@
 
             <ui:MyCard Margin="0,0,0,15"
                        IsVisible="{Binding ShowEntryFlowCard}"
-                       Title="入服引导与账号验证（六步流程）">
+                       Title="入服引导与账号验证">
                 <StackPanel Margin="25,40,25,20"
                             Spacing="14">
                     <StackPanel Spacing="6">
@@ -298,7 +298,7 @@
                             <ui:MyTextBox AcceptsReturn="True"
                                           MinHeight="66"
                                           TextWrapping="Wrap"
-                                          HintText="请填写申诉理由（至少 10 个字，说明具体题目或误判情况）"
+                                          HintText="请填写申诉理由，至少 10 个字"
                                           IsEnabled="{Binding CanSubmitAppeal}"
                                           Text="{Binding AppealReasonInput, Mode=TwoWay}" />
                             <StackPanel Orientation="Horizontal">
@@ -444,7 +444,7 @@
                                                  IsVisible="{Binding HasQuestionnaireQuestions}"
                                                  Command="{Binding SubmitQuestionnaireCommand}"
                                                  IsEnabled="{Binding IsNotBusy}"
-                                                 Text="提交问卷（实时评分）" />
+                                                 Text="提交问卷并实时评分" />
                                 </StackPanel>
 
                                 <ItemsControl IsVisible="{Binding HasQuestionnaireQuestions}"
@@ -586,15 +586,15 @@
                 <StackPanel Margin="25,40,25,20"
                             Spacing="10">
                     <TextBlock TextWrapping="Wrap"
-                               Text="默认优先请求站点的 /api/client/pcl-homepage（先通过 /version 检测版本变更，仅在更新时拉取），不可达或离线时静默回退内置主页。" />
+                               Text="默认使用站点下发的主页。版本变化时重新下载，不可达或离线时使用内置主页。" />
                     <Grid ColumnDefinitions="*,Auto"
                           ColumnSpacing="14">
                         <ui:MyComboBox Grid.Column="0"
                                        HorizontalAlignment="Stretch"
                                        SelectedIndex="{Binding HomepageModeIndex, Mode=TwoWay}">
-                            <ui:MyComboBoxItem Content="远端推送优先（不可用时回退内置原型）" />
-                            <ui:MyComboBoxItem Content="仅使用内置 XAML 原型" />
-                            <ui:MyComboBoxItem Content="空白主页（关闭自定义内容）" />
+                            <ui:MyComboBoxItem Content="站点推送优先" />
+                            <ui:MyComboBoxItem Content="仅使用内置主页" />
+                            <ui:MyComboBoxItem Content="空白主页" />
                         </ui:MyComboBox>
                         <ui:MyButton Grid.Column="1"
                                      MinWidth="130"
