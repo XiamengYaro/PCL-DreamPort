@@ -168,13 +168,21 @@ public sealed partial class ThemeService
     /// <summary>获取当前色彩主题对应的各种参数。</summary>
     public static (int Hue, double LightAdjust, double ChromaAdjust) GetCurrentThemeArgs()
     {
-        var theme = CurrentTheme;
+        return GetThemeArgs(CurrentTheme, IsDarkMode);
+    }
+
+    /// <summary>获取指定色彩主题对应的色相与明度、色度调节参数。</summary>
+    public static (int Hue, double LightAdjust, double ChromaAdjust) GetThemeArgs(
+        ColorTheme theme,
+        bool isDarkMode)
+    {
         return theme switch
         {
             ColorTheme.SkyBlue => (235, 0.36, 0.2),
             ColorTheme.CatBlue => (255, 0, -0.2),
             ColorTheme.DeathBlue => (268, -0.05, -0.1),
             ColorTheme.HmclBlue => (275, -0.03, -0.35),
+            ColorTheme.TianyiBlue => isDarkMode ? (233, 0, -0.15) : (233, 0.5386, -0.25),
 #if DEBUG
             _ => ((int)theme, 0, 0)
 #else
@@ -222,6 +230,57 @@ public sealed partial class ThemeService
             LabColor.FromLch(tone.LBackground, alpha: tone.AToolTip).ToCatColor("ToolTip", false),
             LabColor.FromLch(tone.L7, 0.25, 30, tone.AHalfTransparent).ToCatColor("RedBack", false),
             LabColor.FromLch(tone.LForeground).ToCatColor("Memory", false)
+        ];
+    }
+
+    /// <summary>根据色阶配置与主题计算全部动态配色资源。</summary>
+    public static CatColorResource[] CalculateColors(
+        ToneProfile tone,
+        ColorTheme theme,
+        bool isDarkMode)
+    {
+        return theme == ColorTheme.TianyiBlue
+            ? _CalculateTianyiColors(tone, isDarkMode)
+            : _CalculateColors(tone, GetThemeArgs(theme, isDarkMode));
+    }
+
+    private static CatColorResource[] _CalculateTianyiColors(
+        ToneProfile tone,
+        bool isDarkMode)
+    {
+        const double tianyiHue = 232.69;
+        var tianyiExact = LabColor.FromRgb(0x66, 0xCC, 0xFF);
+        var (lightAdj, chromaAdj) = isDarkMode ? (0d, -0.15d) : (0.5386d, -0.25d);
+
+        CatColorResource MakeColor(string suffix, double l, double c, double alpha = 1.0, bool applyToColor = true) =>
+            LabColor
+                .FromLch(_AdjustLinear(l, lightAdj), _AdjustLinear(c, chromaAdj), tianyiHue, alpha)
+                .ToCatColor(suffix, applyToColor);
+
+        return
+        [
+            LabColor
+                .FromLch(
+                    _AdjustLinear(tone.L1, lightAdj * 0.1),
+                    _AdjustLinear(tone.C1, chromaAdj * 0.25),
+                    tianyiHue)
+                .ToCatColor("1"),
+            isDarkMode
+                ? tianyiExact.ToCatColor("2")
+                : LabColor.FromLch(0.71, 0.145, tianyiHue).ToCatColor("2"),
+            isDarkMode
+                ? LabColor.FromLch(0.69, 0.135, tianyiHue).ToCatColor("3")
+                : tianyiExact.ToCatColor("3"),
+            isDarkMode
+                ? LabColor.FromLch(0.74, 0.125, tianyiHue).ToCatColor("4")
+                : LabColor.FromLch(_AdjustLinear(tone.L4, lightAdj), _AdjustLinear(tone.C4, chromaAdj), tianyiHue).ToCatColor("4"),
+            MakeColor("5", tone.L5, tone.C5),
+            MakeColor("6", tone.L6, tone.C6),
+            MakeColor("7", tone.L7, tone.C7),
+            MakeColor("8", tone.L8, tone.C8),
+            MakeColor("SemiTransparent", tone.L8, tone.C8, tone.ASemiTransparent, applyToColor: false),
+            MakeColor("Bg0", tone.L5, tone.C5),
+            MakeColor("Bg1", tone.L7, tone.C7, tone.ASemiWhite)
         ];
     }
 
@@ -325,7 +384,7 @@ public sealed partial class ThemeService
     /// </summary>
     public static void ApplyColorResources()
     {
-        var colors = _CalculateColors(CurrentTone, GetCurrentThemeArgs());
+        var colors = CalculateColors(CurrentTone, CurrentTheme, IsDarkMode);
         foreach (var c in colors) c.Apply();
     }
 }

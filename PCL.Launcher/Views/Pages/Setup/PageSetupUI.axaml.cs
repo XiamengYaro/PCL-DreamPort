@@ -26,13 +26,15 @@ namespace PCL.Views.Pages.Setup;
 /// </summary>
 public partial class PageSetupUI : MyPageRight, ISetupResetPage
 {
-    private static readonly (string Tag, string Key)[] ThemeColorKeys =
-    [
-        (nameof(ColorTheme.SkyBlue), "Setup.Ui.Theme.Color.SkyBlue"),
-        (nameof(ColorTheme.CatBlue), "Setup.Ui.Theme.Color.CatBlue"),
-        (nameof(ColorTheme.DeathBlue), "Setup.Ui.Theme.Color.CrashBlue"),
-        (nameof(ColorTheme.HmclBlue), "Setup.Ui.Theme.Color.Hmcl")
-    ];
+    private static string GetThemeColorLocalizationKey(ColorTheme theme) => theme switch
+    {
+        ColorTheme.SkyBlue => "Setup.Ui.Theme.Color.SkyBlue",
+        ColorTheme.CatBlue => "Setup.Ui.Theme.Color.CatBlue",
+        ColorTheme.DeathBlue => "Setup.Ui.Theme.Color.CrashBlue",
+        ColorTheme.TianyiBlue => "Setup.Ui.Theme.Color.TianyiBlue",
+        ColorTheme.HmclBlue => "Setup.Ui.Theme.Color.Hmcl",
+        _ => "Setup.Ui.Theme.Color.CatBlue"
+    };
 
     private readonly List<MyCheckBox> _hideChecks = [];
     private readonly MyRadioBox[] _homepageRadios;
@@ -239,7 +241,7 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         _reloading = true;
         try
         {
-            ViewModel.Reload(Math.Max(1, ComboLightColor.ItemCount));
+            ViewModel.Reload(PageSetupUIViewModel.GetAvailableThemes(Basics.IsAprilFool));
             _macTitleBarStyleRadios[Math.Clamp(Config.Preference.MacTitleBarStyle, 0, 1)].SetChecked(true, false);
             CheckLockWindowSize.Checked = Config.Preference.LockWindowSize;
             CheckShowLaunchingHint.Checked = Config.Preference.ShowLaunchingHint;
@@ -299,7 +301,7 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
 
     private void BuildThemeColorItems()
     {
-        var count = Basics.IsAprilFool ? ThemeColorKeys.Length : ThemeColorKeys.Length - 1;
+        var themes = PageSetupUIViewModel.GetAvailableThemes(Basics.IsAprilFool);
         foreach (var combo in new[]
                  {
                      ComboLightColor,
@@ -307,12 +309,12 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
                  })
         {
             combo.Items.Clear();
-            for (var i = 0; i < count; i++)
+            foreach (var theme in themes)
             {
-                var item = new MyComboBoxItem();
+                var item = new MyComboBoxItem { Tag = theme.ToString() };
                 item.SetLocalizedValue(
                     ContentControl.ContentProperty,
-                    ThemeColorKeys[i].Key);
+                    GetThemeColorLocalizationKey(theme));
                 combo.Items.Add(item);
             }
         }

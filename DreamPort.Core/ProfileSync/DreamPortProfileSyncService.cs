@@ -249,7 +249,7 @@ public sealed class DreamPortProfileSyncService
         PclConfig.Preference.Localization.Region = ClampString(profile.Preference.Region, 32, "auto");
         if (Enum.IsDefined(profile.Preference.ColorMode))
             PclConfig.Preference.Theme.ColorMode = profile.Preference.ColorMode;
-        // 严格限定 4 个合规 PCL 蓝色配色主题
+        // 严格限定合规 PCL 蓝色配色主题（含天依蓝）
         if (Enum.IsDefined(profile.Preference.DarkColor))
             PclConfig.Preference.Theme.DarkColor = profile.Preference.DarkColor;
         if (Enum.IsDefined(profile.Preference.LightColor))

@@ -62,6 +62,7 @@ public partial class PageSetupUIViewModel : ViewModelBase
 
     [ObservableProperty] private bool _musicVolumeVisible;
 
+    private IReadOnlyList<ColorTheme> _availableThemes = GetAvailableThemes(Basics.IsAprilFool);
     private bool _reloading;
 
     public string BackgroundTitle =>
@@ -79,6 +80,41 @@ public partial class PageSetupUIViewModel : ViewModelBase
             ? Lang.Text("Setup.Ui.Music.TitleWithCount", _musicCount)
             : Lang.Text("Setup.Ui.Music.Title");
 
+    public static IReadOnlyList<ColorTheme> GetAvailableThemes(bool isAprilFool) =>
+        isAprilFool
+            ? [ColorTheme.SkyBlue, ColorTheme.CatBlue, ColorTheme.DeathBlue, ColorTheme.TianyiBlue, ColorTheme.HmclBlue]
+            : [ColorTheme.SkyBlue, ColorTheme.CatBlue, ColorTheme.DeathBlue, ColorTheme.TianyiBlue];
+
+    public static int FindThemeIndex(IReadOnlyList<ColorTheme> themes, ColorTheme color)
+    {
+        for (var i = 0; i < themes.Count; i++)
+        {
+            if (themes[i] == color) return i;
+        }
+
+        for (var i = 0; i < themes.Count; i++)
+        {
+            if (themes[i] == ColorTheme.CatBlue) return i;
+        }
+
+        return 0;
+    }
+
+    public static bool TryResolveThemeByIndex(
+        IReadOnlyList<ColorTheme> themes,
+        int index,
+        out ColorTheme theme)
+    {
+        if (index >= 0 && index < themes.Count)
+        {
+            theme = themes[index];
+            return true;
+        }
+
+        theme = ColorTheme.CatBlue;
+        return false;
+    }
+
     partial void OnDarkModeSelectedIndexChanged(int value)
     {
         if (!_reloading && value >= 0)
@@ -87,14 +123,14 @@ public partial class PageSetupUIViewModel : ViewModelBase
 
     partial void OnLightColorSelectedIndexChanged(int value)
     {
-        if (!_reloading && value >= 0)
-            Config.Preference.Theme.LightColor = (ColorTheme)value;
+        if (!_reloading && TryResolveThemeByIndex(_availableThemes, value, out var theme))
+            Config.Preference.Theme.LightColor = theme;
     }
 
     partial void OnDarkColorSelectedIndexChanged(int value)
     {
-        if (!_reloading && value >= 0)
-            Config.Preference.Theme.DarkColor = (ColorTheme)value;
+        if (!_reloading && TryResolveThemeByIndex(_availableThemes, value, out var theme))
+            Config.Preference.Theme.DarkColor = theme;
     }
 
     partial void OnBackgroundSuitSelectedIndexChanged(int value)
@@ -135,17 +171,19 @@ public partial class PageSetupUIViewModel : ViewModelBase
         if (!_reloading) Config.Preference.Music.Volume = value;
     }
 
-    public void Reload(int themeColorCount = 4)
+    public void Reload(IReadOnlyList<ColorTheme>? availableThemes = null)
     {
         _reloading = true;
         try
         {
+            _availableThemes = availableThemes is { Count: > 0 }
+                ? availableThemes
+                : GetAvailableThemes(Basics.IsAprilFool);
             var theme = Config.Preference.Theme;
-            var colorMax = Math.Max(0, themeColorCount - 1);
             LauncherOpacity = theme.WindowOpacity;
             DarkModeSelectedIndex = Math.Clamp((int)theme.ColorMode, 0, 2);
-            LightColorSelectedIndex = Math.Clamp((int)theme.LightColor, 0, colorMax);
-            DarkColorSelectedIndex = Math.Clamp((int)theme.DarkColor, 0, colorMax);
+            LightColorSelectedIndex = FindThemeIndex(_availableThemes, theme.LightColor);
+            DarkColorSelectedIndex = FindThemeIndex(_availableThemes, theme.DarkColor);
 
             BackgroundOpacity = Config.Preference.Background.WallpaperOpacity;
             BackgroundBlur = Config.Preference.Background.WallpaperBlurRadius;

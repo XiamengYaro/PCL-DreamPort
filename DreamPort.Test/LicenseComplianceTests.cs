@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PCL;
 using PCL.Core.App;
+using PCL.Core.UI.Theme;
 
 namespace DreamPort.Test;
 
@@ -32,19 +33,89 @@ public sealed class LicenseComplianceTests
     }
 
     [TestMethod]
-    public void ColorThemes_RemainLockedToFourOriginalBlueHues()
+    public void ColorThemes_RemainLockedToApprovedBlueHues()
     {
         var values = Enum.GetValues<ColorTheme>();
-        Assert.HasCount(4, values);
+        Assert.HasCount(5, values);
         CollectionAssert.AreEquivalent(
             new[]
             {
                 ColorTheme.SkyBlue,
                 ColorTheme.CatBlue,
                 ColorTheme.DeathBlue,
-                ColorTheme.HmclBlue
+                ColorTheme.HmclBlue,
+                ColorTheme.TianyiBlue
             },
             values);
+
+        foreach (var theme in values)
+        {
+            foreach (var isDarkMode in new[] { false, true })
+            {
+                var (hue, _, _) = ThemeService.GetThemeArgs(theme, isDarkMode);
+                Assert.IsTrue(
+                    hue is >= 220 and <= 280,
+                    $"主题 {theme} (dark={isDarkMode}) 色相 {hue} 必须锁定在蓝色区间 220..280。");
+            }
+        }
+    }
+
+    [TestMethod]
+    public void TianyiBlue_GeneratesExact66CcFfAccent_DarkSurfaces_AndMapsComboIndexSafely()
+    {
+        var expectedSuffixes = new[] { "1", "2", "3", "4", "5", "6", "7", "8", "SemiTransparent", "Bg0", "Bg1" };
+
+        var lightPalette = ThemeService
+            .CalculateColors(ToneProfileConfig.DefaultLight, ColorTheme.TianyiBlue, isDarkMode: false)
+            .ToDictionary(c => c.Suffix, StringComparer.Ordinal);
+        CollectionAssert.AreEquivalent(expectedSuffixes, lightPalette.Keys.ToArray());
+        Assert.AreEqual((0x66, 0xCC, 0xFF), ToSrgbBytes(lightPalette["3"]));
+
+        var darkPalette = ThemeService
+            .CalculateColors(ToneProfileConfig.DefaultDark, ColorTheme.TianyiBlue, isDarkMode: true)
+            .ToDictionary(c => c.Suffix, StringComparer.Ordinal);
+        CollectionAssert.AreEquivalent(expectedSuffixes, darkPalette.Keys.ToArray());
+        Assert.AreEqual((0x66, 0xCC, 0xFF), ToSrgbBytes(darkPalette["2"]));
+        foreach (var surfaceKey in new[] { "6", "7", "8" })
+        {
+            var (r, g, b) = ToSrgbBytes(darkPalette[surfaceKey]);
+            Assert.IsTrue(
+                r < 64 && g < 64 && b < 64,
+                $"深色模式表面 {surfaceKey} 应保持暗色，实际为 ({r}, {g}, {b})。");
+        }
+
+        CollectionAssert.AreEqual(
+            new[] { ColorTheme.SkyBlue, ColorTheme.CatBlue, ColorTheme.DeathBlue, ColorTheme.TianyiBlue },
+            PageSetupUIViewModel.GetAvailableThemes(isAprilFool: false).ToArray());
+        CollectionAssert.AreEqual(
+            new[] { ColorTheme.SkyBlue, ColorTheme.CatBlue, ColorTheme.DeathBlue, ColorTheme.TianyiBlue, ColorTheme.HmclBlue },
+            PageSetupUIViewModel.GetAvailableThemes(isAprilFool: true).ToArray());
+
+        var nonAprilThemes = PageSetupUIViewModel.GetAvailableThemes(isAprilFool: false);
+        Assert.IsTrue(PageSetupUIViewModel.TryResolveThemeByIndex(nonAprilThemes, 3, out var resolved));
+        Assert.AreEqual(ColorTheme.TianyiBlue, resolved);
+        Assert.AreEqual(3, PageSetupUIViewModel.FindThemeIndex(nonAprilThemes, ColorTheme.TianyiBlue));
+        Assert.AreEqual(1, PageSetupUIViewModel.FindThemeIndex(nonAprilThemes, ColorTheme.HmclBlue));
+        Assert.IsFalse(PageSetupUIViewModel.TryResolveThemeByIndex(nonAprilThemes, 4, out _));
+
+        var aprilThemes = PageSetupUIViewModel.GetAvailableThemes(isAprilFool: true);
+        Assert.IsTrue(PageSetupUIViewModel.TryResolveThemeByIndex(aprilThemes, 3, out var aprilTianyi));
+        Assert.AreEqual(ColorTheme.TianyiBlue, aprilTianyi);
+        Assert.IsTrue(PageSetupUIViewModel.TryResolveThemeByIndex(aprilThemes, 4, out var aprilHmcl));
+        Assert.AreEqual(ColorTheme.HmclBlue, aprilHmcl);
+        Assert.AreEqual(3, PageSetupUIViewModel.FindThemeIndex(aprilThemes, ColorTheme.TianyiBlue));
+        Assert.AreEqual(4, PageSetupUIViewModel.FindThemeIndex(aprilThemes, ColorTheme.HmclBlue));
+    }
+
+    private static (byte R, byte G, byte B) ToSrgbBytes(CatColorResource color) =>
+        (LinearToSrgbByte(color.Red), LinearToSrgbByte(color.Green), LinearToSrgbByte(color.Blue));
+
+    private static byte LinearToSrgbByte(double linear)
+    {
+        var encoded = linear <= 0.0031308d
+            ? 12.92d * linear
+            : 1.055d * Math.Pow(linear, 1d / 2.4d) - 0.055d;
+        return (byte)Math.Clamp(Math.Round(encoded * 255d), 0d, 255d);
     }
 
     [TestMethod]
