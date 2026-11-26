@@ -57,7 +57,6 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
     private DispatcherTimer? _homepageLivePatchTimer;
     private FileSystemWatcher? _homepageLiveWatcher;
     private bool _initialContentPending;
-    private string? _lastWpfToastSource;
     private HomepageContent? _pendingBackgroundContent;
     private int _refreshVersion;
 
@@ -273,9 +272,6 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
 
     private void LoadContent(HomepageContent content)
     {
-        if (content.Kind != HomepageSourceKind.CustomXaml)
-            _lastWpfToastSource = null;
-
         switch (content.Kind)
         {
             case HomepageSourceKind.Blank:
@@ -345,7 +341,6 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
         var format = HomepageXamlFormatDetector.Detect(xaml);
         if (format == HomepageXamlFormat.Avalonia)
         {
-            _lastWpfToastSource = null;
             var avaloniaResult = HomepageAvaloniaRenderer.Render(xaml);
             if (avaloniaResult.Error is { Length: > 0 }
                 || avaloniaResult.Root is null)
@@ -391,25 +386,12 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
             return;
         }
 
-        ShowWpfMigrationToast(content);
-
         _panCustom.Children.Clear();
         foreach (var control in rendered.Controls)
             _panCustom.Children.Add(control);
 
         ApplySanitizeHints(rendered);
         ApplyHomepageLivePatchesFromFile();
-    }
-
-    private void ShowWpfMigrationToast(HomepageContent content)
-    {
-        var source = content.SourceText ?? "wpf";
-        if (string.Equals(_lastWpfToastSource, source, StringComparison.Ordinal))
-            return;
-
-        _lastWpfToastSource = source;
-        HintService.Show(
-            Hints.Warning(Lang.Text("Launch.Homepage.WpfMigrationToast")));
     }
 
     private static void ApplySanitizeHints(RuntimeXamlRenderResult result)

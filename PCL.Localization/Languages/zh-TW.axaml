@@ -1652,7 +1652,6 @@
     <sys:String x:Key="Launch.Homepage.LoadFailed.Title">載入首頁介面失敗</sys:String>
     <sys:String x:Key="Launch.Homepage.Loading">正在載入首頁……</sys:String>
     <sys:String x:Key="Launch.Homepage.InvalidXaml">首頁內容不是有效的 XAML 或 AXAML。</sys:String>
-    <sys:String x:Key="Launch.Homepage.WpfMigrationToast">目前正在使用 WPF 自訂首頁，顯示可能會有問題。</sys:String>
     <sys:String x:Key="Launch.Homepage.News.Loading">載入中……</sys:String>
     <sys:String x:Key="Launch.Homepage.News.ViewDetail">檢視詳情</sys:String>
     <sys:String x:Key="Launch.Homepage.Preset.EchoCave.Removed">回聲洞 因為只有空殼因此已被移除，請前往設定選擇其他預設首頁</sys:String>

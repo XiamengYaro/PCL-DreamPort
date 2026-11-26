@@ -1652,7 +1652,6 @@
     <sys:String x:Key="Launch.Homepage.LoadFailed.Title">Failed to load homepage</sys:String>
     <sys:String x:Key="Launch.Homepage.Loading">Loading homepage...</sys:String>
     <sys:String x:Key="Launch.Homepage.InvalidXaml">The homepage content is not valid XAML or AXAML.</sys:String>
-    <sys:String x:Key="Launch.Homepage.WpfMigrationToast">You are using a WPF custom homepage, which may have display issues.</sys:String>
     <sys:String x:Key="Launch.Homepage.News.Loading">Loading...</sys:String>
     <sys:String x:Key="Launch.Homepage.News.ViewDetail">View details</sys:String>
     <sys:String x:Key="Launch.Homepage.Preset.EchoCave.Removed">The Echo Cave preset has been removed as it only had a shell. Please go to Settings and select another homepage preset.</sys:String>
