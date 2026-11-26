@@ -89,7 +89,7 @@ jobs:
         with:
           draft: true
           tag_name: v${{ inputs.version }}
-          name: Release ${{ inputs.version }}
+          name: PCL-梦港 v${{ inputs.version }}
           body_path: CHANGELOG.md
           prerelease: ${{ inputs.configuration == 'Beta' }}
         env:
