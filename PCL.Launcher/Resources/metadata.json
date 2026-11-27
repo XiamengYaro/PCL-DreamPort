@@ -1,10 +1,10 @@
 {
   "name": "PCL-梦港",
   "version": {
-    "base": "0.1.6",
+    "base": "0.1.7",
     "upstream": "2.12.1",
     "suffix": "",
-    "code": 7
+    "code": 8
   },
   "licenses": [
     {
