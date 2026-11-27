@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text;
+using DreamPort.Core.Updates;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.IO;
@@ -108,10 +110,7 @@ public static class UpdateManager
             return;
         }
 
-        var dlTargetPath = Path.Combine(
-            LauncherPaths.ExecutableDirectory,
-            "PCL",
-            "PCL-DreamPort.exe");
+        var dlTargetPath = GetUpdateDownloadPath();
         LauncherCommon.RunInNewThread(() =>
         {
             try
@@ -159,7 +158,7 @@ public static class UpdateManager
                         _ =>
                         {
                             var curHash = Files.GetFileSha256(dlTargetPath);
-                            if ((curHash ?? "") != (version.Sha256 ?? ""))
+                            if (!string.Equals(curHash, version.Sha256, StringComparison.OrdinalIgnoreCase))
                                 throw new Exception(
                                     Lang.Text(
                                         "Update.Error.Sha256Mismatch",
@@ -244,8 +243,21 @@ public static class UpdateManager
         });
     }
 
+    public static string GetUpdateDownloadPath()
+    {
+        return OperatingSystem.IsMacOS()
+            ? Path.Combine(LauncherPaths.Temp, "Cache", "Update", "PCL-DreamPort-macOS.zip")
+            : Path.Combine(LauncherPaths.ExecutableDirectory, "PCL", "PCL-DreamPort.exe");
+    }
+
     public static void UpdateRestart(bool triggerRestartAndByEnd, bool triggerRestart = true)
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            UpdateRestartMacOs(triggerRestartAndByEnd, triggerRestart);
+            return;
+        }
+
         try
         {
             var fileName = Path.Combine(
@@ -285,6 +297,95 @@ public static class UpdateManager
                 "",
                 "",
                 true);
+        }
+    }
+
+    private static void UpdateRestartMacOs(bool triggerRestartAndByEnd, bool triggerRestart)
+    {
+        isUpdateWaitingRestart = false;
+        try
+        {
+            if (!DreamPortUpdateService.TryResolveCurrentMacAppBundlePath(out var targetAppPath))
+            {
+                LauncherCommon.Log("[System] 更新失败：无法定位可写的 macOS .app 应用包");
+                LauncherCommon.RunInUi(() => UpdateUi.Current?.ShowHint(
+                    Lang.Text("Update.ManualDownloadRequired"),
+                    NotificationType.Error));
+                return;
+            }
+
+            var zipPath = GetUpdateDownloadPath();
+            if (!File.Exists(zipPath))
+            {
+                LauncherCommon.Log("[System] 更新失败：未找到 macOS 更新压缩包");
+                LauncherCommon.RunInUi(() => UpdateUi.Current?.ShowHint(
+                    Lang.Text("Update.Error.FetchFailed"),
+                    NotificationType.Error));
+                return;
+            }
+
+            var updateCacheDir = Path.Combine(LauncherPaths.Temp, "Cache", "Update");
+            var stagedRoot = Path.Combine(updateCacheDir, "Staged");
+            if (Directory.Exists(stagedRoot))
+                Directory.Delete(stagedRoot, recursive: true);
+            Directory.CreateDirectory(stagedRoot);
+
+            var unzipInfo = new ProcessStartInfo("/usr/bin/ditto")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true
+            };
+            unzipInfo.ArgumentList.Add("-x");
+            unzipInfo.ArgumentList.Add("-k");
+            unzipInfo.ArgumentList.Add(zipPath);
+            unzipInfo.ArgumentList.Add(stagedRoot);
+            using (var unzipProc = Process.Start(unzipInfo))
+            {
+                if (unzipProc is null)
+                    throw new InvalidOperationException("无法启动 ditto 解压更新包");
+                var stderr = unzipProc.StandardError.ReadToEnd();
+                unzipProc.WaitForExit();
+                if (unzipProc.ExitCode != 0)
+                    throw new InvalidOperationException($"ditto 解压更新包失败（exit {unzipProc.ExitCode}）：{stderr}");
+            }
+
+            var stagedAppPath = Directory
+                .EnumerateDirectories(stagedRoot, "*.app", SearchOption.AllDirectories)
+                .FirstOrDefault(dir => File.Exists(Path.Combine(dir, "Contents", "MacOS", "PCL.Launcher")));
+            if (string.IsNullOrEmpty(stagedAppPath))
+                throw new DirectoryNotFoundException("更新包内未找到有效的 PCL-梦港.app");
+
+            var script = DreamPortUpdateService.BuildMacOsDittoReplaceScript(
+                    Environment.ProcessId,
+                    stagedAppPath,
+                    targetAppPath,
+                    relaunch: triggerRestart)
+                .Replace("\r\n", "\n", StringComparison.Ordinal);
+            var scriptPath = Path.Combine(updateCacheDir, "apply-update.sh");
+            File.WriteAllText(scriptPath, script, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            LauncherCommon.Log($"[System] 启动 macOS 更新替换脚本：{targetAppPath} (relaunch={triggerRestart})");
+            var applyInfo = new ProcessStartInfo("/bin/sh")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            applyInfo.ArgumentList.Add(scriptPath);
+            Process.Start(applyInfo);
+
+            if (triggerRestartAndByEnd)
+            {
+                UpdateUi.Current?.ExitApplication(true);
+                LauncherCommon.Log("[System] 已由于更新结束 macOS 应用以完成替换");
+            }
+        }
+        catch (Exception ex)
+        {
+            LauncherCommon.Log(ex, "[System] macOS 应用内更新替换失败");
+            LauncherCommon.RunInUi(() => UpdateUi.Current?.ShowHint(
+                Lang.Text("Update.Error.FetchFailed"),
+                NotificationType.Error));
         }
     }
 

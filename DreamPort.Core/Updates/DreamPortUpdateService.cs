@@ -296,6 +296,8 @@ public static partial class DreamPortUpdateService
             || name.EndsWith(".sig", StringComparison.Ordinal)
             || name.EndsWith(".asc", StringComparison.Ordinal)
             || name.EndsWith(".blockmap", StringComparison.Ordinal)
+            || name.EndsWith(".sigstore.json", StringComparison.Ordinal)
+            || name.EndsWith(".json", StringComparison.Ordinal)
             || name.Contains("sha256sums", StringComparison.Ordinal))
         {
             return null;
@@ -332,6 +334,112 @@ public static partial class DreamPortUpdateService
         }
 
         return null;
+    }
+
+    public static bool IsValidSha256Hex(string? sha)
+        => !string.IsNullOrWhiteSpace(sha) && Sha256HexPattern().IsMatch(sha.Trim());
+
+    public static bool VerifyFileSha256(string filePath, string? expectedSha256, out string? actualSha256)
+    {
+        actualSha256 = null;
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath) || !IsValidSha256Hex(expectedSha256))
+            return false;
+
+        using var sha = SHA256.Create();
+        using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        actualSha256 = Convert.ToHexStringLower(sha.ComputeHash(fs));
+        return string.Equals(actualSha256, expectedSha256!.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static DreamPortUpdateAsset? SelectPreferredAsset(
+        IReadOnlyList<DreamPortUpdateAsset> assets,
+        string? targetPlatform)
+    {
+        if (assets.Count == 0)
+            return null;
+
+        var matched = targetPlatform is null
+            ? assets
+            : assets.Where(a => string.Equals(a.Platform, targetPlatform, StringComparison.Ordinal)).ToList();
+        if (matched.Count == 0)
+            return null;
+
+        if (targetPlatform is not null)
+        {
+            string[] preferredSuffixes = targetPlatform switch
+            {
+                "mac-arm64" or "mac-x64" => [".zip", ".dmg"],
+                "win-x64" or "win-arm64" => [".exe", ".zip"],
+                "linux-x64" or "linux-arm64" => [".appimage", ".deb", ".rpm"],
+                _ => []
+            };
+
+            foreach (var suffix in preferredSuffixes)
+            {
+                var found = matched.FirstOrDefault(a => a.Name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+                if (found is not null)
+                    return found;
+            }
+        }
+
+        return matched[0];
+    }
+
+    public static string? ResolveMacAppBundlePathFromBaseDirectory(string? baseDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(baseDirectory))
+            return null;
+
+        var full = Path.GetFullPath(baseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        if (full.Contains("/AppTranslocation/", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var dir = new DirectoryInfo(full);
+        while (dir is not null)
+        {
+            if (dir.Name.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+
+        return null;
+    }
+
+    public static bool TryResolveCurrentMacAppBundlePath(out string appBundlePath)
+    {
+        appBundlePath = string.Empty;
+        if (!OperatingSystem.IsMacOS())
+            return false;
+
+        var resolved = ResolveMacAppBundlePathFromBaseDirectory(AppContext.BaseDirectory);
+        if (string.IsNullOrWhiteSpace(resolved) || !Directory.Exists(resolved))
+            return false;
+
+        var infoPlist = Path.Combine(resolved, "Contents", "Info.plist");
+        if (!File.Exists(infoPlist))
+            return false;
+
+        var parentDir = Path.GetDirectoryName(resolved);
+        if (string.IsNullOrWhiteSpace(parentDir)
+            || resolved.StartsWith("/Volumes/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        try
+        {
+            var probe = Path.Combine(parentDir, $".dp-write-probe-{Guid.NewGuid():N}");
+            using (File.Create(probe, 1, FileOptions.DeleteOnClose))
+            {
+            }
+
+            appBundlePath = resolved;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static string? ParseSha256Sums(string? content, string? assetFileName)
@@ -447,9 +555,7 @@ public static partial class DreamPortUpdateService
                     Message: "当前已是最新版本（暂无远程发布版本）");
             }
 
-            var asset = targetPlatform is null
-                ? release.Assets.FirstOrDefault()
-                : release.Assets.FirstOrDefault(a => string.Equals(a.Platform, targetPlatform, StringComparison.Ordinal));
+            var asset = SelectPreferredAsset(release.Assets, targetPlatform);
 
             var sha256 = asset?.Sha256;
             if (sha256 is null && asset is not null && !string.IsNullOrEmpty(shaSumsUrl))
@@ -559,7 +665,11 @@ public static partial class DreamPortUpdateService
     /// <summary>
     /// 生成 macOS 无感原子替换并重启脚本（强制使用 <c>ditto</c> 保留签名与扩展属性，并使用 <c>open -n</c> 拉起新进程，禁止 <c>cp -R</c>）。
     /// </summary>
-    public static string BuildMacOsDittoReplaceScript(int currentPid, string stagedAppPath, string targetAppPath)
+    public static string BuildMacOsDittoReplaceScript(
+        int currentPid,
+        string stagedAppPath,
+        string targetAppPath,
+        bool relaunch = true)
     {
         if (currentPid <= 0)
             throw new ArgumentOutOfRangeException(nameof(currentPid));
@@ -570,6 +680,8 @@ public static partial class DreamPortUpdateService
 
         var qStaged = QuotePosixShell(stagedAppPath);
         var qTarget = QuotePosixShell(targetAppPath);
+        var qBackup = QuotePosixShell(targetAppPath + ".dp-update-bak");
+        var relaunchLine = relaunch ? $"\nopen -n {qTarget}" : string.Empty;
         return $$"""
             #!/bin/sh
             set -e
@@ -582,8 +694,19 @@ public static partial class DreamPortUpdateService
               fi
               sleep 0.1
             done
-            ditto {{qStaged}} {{qTarget}}
-            open -n {{qTarget}}
+            rm -rf {{qBackup}}
+            if [ -e {{qTarget}} ]; then
+              mv {{qTarget}} {{qBackup}}
+            fi
+            if ! ditto {{qStaged}} {{qTarget}}; then
+              rm -rf {{qTarget}}
+              if [ -e {{qBackup}} ]; then
+                mv {{qBackup}} {{qTarget}}
+              fi
+              exit 1
+            fi
+            rm -rf {{qBackup}}
+            xattr -dr com.apple.quarantine {{qTarget}} 2>/dev/null || true{{relaunchLine}}
             """;
     }
 

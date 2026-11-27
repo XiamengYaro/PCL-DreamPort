@@ -116,7 +116,7 @@ jobs:
           set -euo pipefail
           cd release
           shopt -s nullglob
-          files=(*.zip *.dmg *.AppImage *.deb *.rpm)
+          files=(*.exe *.zip *.dmg *.AppImage *.deb *.rpm)
           if [ ${#files[@]} -eq 0 ]; then
             echo "no release archives found for SHA256SUMS" >&2
             exit 1

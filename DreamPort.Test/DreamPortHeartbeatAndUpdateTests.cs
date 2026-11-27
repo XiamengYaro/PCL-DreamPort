@@ -393,11 +393,24 @@ public sealed class DreamPortHeartbeatAndUpdateTests
         Assert.AreEqual("mac-arm64", DreamPortUpdateService.DetectGitHubAssetPlatform("PCL-DreamPort-1.0.0-mac-arm64.dmg"));
         Assert.AreEqual("mac-x64", DreamPortUpdateService.DetectGitHubAssetPlatform("PCL-DreamPort-1.0.0-osx-x86_64.zip"));
         Assert.AreEqual("win-x64", DreamPortUpdateService.DetectGitHubAssetPlatform("PCL-DreamPort-1.0.0-win-x64.zip"));
+        Assert.AreEqual("win-x64", DreamPortUpdateService.DetectGitHubAssetPlatform("PCL_DreamPort_Release_windows_x64.exe"));
         Assert.AreEqual("win-arm64", DreamPortUpdateService.DetectGitHubAssetPlatform("PCL-DreamPort-1.0.0-windows-aarch64.zip"));
+        Assert.AreEqual("win-arm64", DreamPortUpdateService.DetectGitHubAssetPlatform("PCL_DreamPort_Release_windows_ARM64.exe"));
         Assert.AreEqual("linux-x64", DreamPortUpdateService.DetectGitHubAssetPlatform("PCL-DreamPort-1.0.0-linux-amd64.tar.gz"));
         Assert.AreEqual("linux-arm64", DreamPortUpdateService.DetectGitHubAssetPlatform("PCL-DreamPort-1.0.0-linux-arm64.tar.gz"));
         Assert.IsNull(DreamPortUpdateService.DetectGitHubAssetPlatform("SHA256SUMS"));
+        Assert.IsNull(DreamPortUpdateService.DetectGitHubAssetPlatform("PCL_DreamPort_Release_windows_x64.exe.sigstore.json"));
         Assert.IsNull(DreamPortUpdateService.DetectGitHubAssetPlatform("PCL-DreamPort-1.0.0-mac.dmg"));
+
+        var mixedAssets = new[]
+        {
+            new DreamPortUpdateAsset("PCL_DreamPort_Release_macos_ARM64.dmg", "https://dl.xmcraft.cn/a.dmg", 10, new string('1', 64), "mac-arm64"),
+            new DreamPortUpdateAsset("PCL_DreamPort_Release_macos_ARM64.zip", "https://dl.xmcraft.cn/a.zip", 10, new string('2', 64), "mac-arm64"),
+            new DreamPortUpdateAsset("PCL_DreamPort_Release_windows_x64.zip", "https://dl.xmcraft.cn/w.zip", 10, new string('3', 64), "win-x64"),
+            new DreamPortUpdateAsset("PCL_DreamPort_Release_windows_x64.exe", "https://dl.xmcraft.cn/w.exe", 10, new string('4', 64), "win-x64")
+        };
+        Assert.AreEqual("PCL_DreamPort_Release_macos_ARM64.zip", DreamPortUpdateService.SelectPreferredAsset(mixedAssets, "mac-arm64")?.Name);
+        Assert.AreEqual("PCL_DreamPort_Release_windows_x64.exe", DreamPortUpdateService.SelectPreferredAsset(mixedAssets, "win-x64")?.Name);
 
         var expectedHash = new string('c', 64);
         var sumsContent = $"""
@@ -452,6 +465,9 @@ public sealed class DreamPortHeartbeatAndUpdateTests
             Assert.IsTrue(okRes.Ok);
             Assert.IsTrue(File.Exists(okTarget));
             Assert.IsFalse(File.Exists(okTarget + ".dp-update-part"));
+            Assert.IsTrue(DreamPortUpdateService.VerifyFileSha256(okTarget, goodHash.ToUpperInvariant(), out var verifiedHash));
+            Assert.AreEqual(goodHash, verifiedHash);
+            Assert.IsFalse(DreamPortUpdateService.VerifyFileSha256(okTarget, badHash, out _));
 
             var badTarget = Path.Combine(tempDir, "tampered.zip");
             var badRes = await DreamPortUpdateService.DownloadAndVerifyAsync(http, "https://dl.xmcraft.cn/bad.zip", badTarget, badHash);
@@ -462,13 +478,37 @@ public sealed class DreamPortHeartbeatAndUpdateTests
             var missingHashRes = await DreamPortUpdateService.DownloadAndVerifyAsync(http, "https://dl.xmcraft.cn/nohash.zip", badTarget, null);
             Assert.IsFalse(missingHashRes.Ok);
 
+            Assert.AreEqual(
+                "/Applications/PCL-梦港.app",
+                DreamPortUpdateService.ResolveMacAppBundlePathFromBaseDirectory("/Applications/PCL-梦港.app/Contents/MacOS/"));
+            Assert.IsNull(
+                DreamPortUpdateService.ResolveMacAppBundlePathFromBaseDirectory("/private/var/folders/x/AppTranslocation/abc/d/PCL-梦港.app/Contents/MacOS/"));
+            Assert.IsNull(
+                DreamPortUpdateService.ResolveMacAppBundlePathFromBaseDirectory("/tmp/plain-bin-dir"));
+
             var script = DreamPortUpdateService.BuildMacOsDittoReplaceScript(
                 12345,
                 "/tmp/Staging/PCL-DreamPort.app",
                 "/Applications/PCL-DreamPort.app");
             Assert.IsTrue(script.Contains("ditto '/tmp/Staging/PCL-DreamPort.app' '/Applications/PCL-DreamPort.app'", StringComparison.Ordinal));
+            Assert.IsTrue(script.Contains("xattr -dr com.apple.quarantine '/Applications/PCL-DreamPort.app'", StringComparison.Ordinal));
             Assert.IsTrue(script.Contains("open -n '/Applications/PCL-DreamPort.app'", StringComparison.Ordinal));
             Assert.IsFalse(script.Contains("cp -R", StringComparison.OrdinalIgnoreCase));
+
+            var quietScript = DreamPortUpdateService.BuildMacOsDittoReplaceScript(
+                12345,
+                "/tmp/Staging/PCL-DreamPort.app",
+                "/Applications/PCL-DreamPort.app",
+                relaunch: false);
+            Assert.IsTrue(quietScript.Contains("ditto '/tmp/Staging/PCL-DreamPort.app' '/Applications/PCL-DreamPort.app'", StringComparison.Ordinal));
+            Assert.IsFalse(quietScript.Contains("open -n", StringComparison.Ordinal));
+
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "PCL Community Edition.slnx")))
+                dir = dir.Parent;
+            Assert.IsNotNull(dir);
+            var workflowYml = File.ReadAllText(Path.Combine(dir.FullName, ".github", "workflows", "release-publish.yml"));
+            Assert.IsTrue(workflowYml.Contains("files=(*.exe *.zip *.dmg *.AppImage *.deb *.rpm)", StringComparison.Ordinal));
         }
         finally
         {

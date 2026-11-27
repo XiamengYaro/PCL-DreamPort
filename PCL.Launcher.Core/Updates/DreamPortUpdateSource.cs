@@ -86,13 +86,25 @@ public sealed class DreamPortUpdateSource : IUpdateSource
             ? existing
             : FetchCheckResult(channel, arch);
 
-        if (string.IsNullOrWhiteSpace(check.DownloadUrl) || string.IsNullOrWhiteSpace(check.Sha256))
+        if (string.IsNullOrWhiteSpace(check.DownloadUrl) || !DreamPortUpdateService.IsValidSha256Hex(check.Sha256))
             throw new InvalidOperationException(check.Message);
 
+        var expectedSha256 = check.Sha256!.Trim().ToLowerInvariant();
         var tempDir = Path.Combine(LauncherPaths.Temp, "Cache", "Update", "Download");
         Directory.CreateDirectory(tempDir);
-        var tempFileName = string.IsNullOrWhiteSpace(check.AssetName) ? $"{check.Sha256}.bin" : check.AssetName;
-        var tempPath = Path.Combine(tempDir, tempFileName);
+        var tempFileName = string.IsNullOrWhiteSpace(check.AssetName) ? $"{expectedSha256}.bin" : check.AssetName;
+        var partPath = Path.Combine(tempDir, tempFileName + ".dp-update-part");
+        if (File.Exists(partPath))
+        {
+            try
+            {
+                File.Delete(partPath);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
 
         var loaders = new List<Loading.LoaderBase>
         {
@@ -100,7 +112,7 @@ public sealed class DreamPortUpdateSource : IUpdateSource
                 Lang.Text("Update.Task.GetVersionInfo"),
                 load =>
                 {
-                    load.output = [new DownloadFile([check.DownloadUrl], tempPath)];
+                    load.output = [new DownloadFile([check.DownloadUrl], partPath)];
                 }),
             new LoaderDownload(Lang.Text("Update.Task.DownloadFile"), [])
             {
@@ -110,10 +122,26 @@ public sealed class DreamPortUpdateSource : IUpdateSource
                 Lang.Text("Update.Task.ApplyFile"),
                 _ =>
                 {
+                    if (!DreamPortUpdateService.VerifyFileSha256(partPath, expectedSha256, out var actualHash))
+                    {
+                        try
+                        {
+                            if (File.Exists(partPath))
+                                File.Delete(partPath);
+                        }
+                        catch
+                        {
+                            // ignore
+                        }
+
+                        throw new InvalidOperationException(
+                            Lang.Text("Update.Error.Sha256Mismatch", expectedSha256, actualHash ?? string.Empty));
+                    }
+
                     var outDir = Path.GetDirectoryName(output);
                     if (!string.IsNullOrEmpty(outDir))
                         Directory.CreateDirectory(outDir);
-                    File.Copy(tempPath, output, overwrite: true);
+                    File.Move(partPath, output, overwrite: true);
                 })
             {
                 DisplayNameFactory = () => Lang.Text("Update.Task.ApplyFile")

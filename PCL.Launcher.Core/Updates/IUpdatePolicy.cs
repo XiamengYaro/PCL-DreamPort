@@ -1,3 +1,4 @@
+using DreamPort.Core.Updates;
 using PCL.Core.Platform;
 
 namespace PCL;
@@ -19,6 +20,12 @@ public sealed class WindowsUpdatePolicy : IUpdatePolicy
 {
     public bool SupportsInAppUpdate => true;
     public string InstallButtonKey => "Setup.Update.Install";
+}
+
+public sealed class MacOsUpdatePolicy : IUpdatePolicy
+{
+    public bool SupportsInAppUpdate => DreamPortUpdateService.TryResolveCurrentMacAppBundlePath(out _);
+    public string InstallButtonKey => SupportsInAppUpdate ? "Setup.Update.Install" : "Setup.Update.OpenDownload";
 }
 
 public sealed class ManualUpdatePolicy : IUpdatePolicy

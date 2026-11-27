@@ -46,6 +46,7 @@ public static class LauncherServiceRegistration
         services.AddSingleton<IUpdatePolicy>(_ => kind switch
         {
             PlatformKind.Windows => new WindowsUpdatePolicy(),
+            PlatformKind.MacOs => new MacOsUpdatePolicy(),
             _ => new ManualUpdatePolicy()
         });
         services.AddSingleton<IPlatformFontProvider>(_ => kind switch
