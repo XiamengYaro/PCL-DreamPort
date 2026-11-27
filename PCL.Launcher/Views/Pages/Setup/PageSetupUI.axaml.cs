@@ -33,7 +33,7 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         ColorTheme.DeathBlue => "Setup.Ui.Theme.Color.CrashBlue",
         ColorTheme.TianyiBlue => "Setup.Ui.Theme.Color.TianyiBlue",
         ColorTheme.HmclBlue => "Setup.Ui.Theme.Color.Hmcl",
-        _ => "Setup.Ui.Theme.Color.CatBlue"
+        _ => "Setup.Ui.Theme.Color.TianyiBlue"
     };
 
     private readonly List<MyCheckBox> _hideChecks = [];

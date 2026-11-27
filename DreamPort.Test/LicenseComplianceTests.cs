@@ -95,8 +95,17 @@ public sealed class LicenseComplianceTests
         Assert.IsTrue(PageSetupUIViewModel.TryResolveThemeByIndex(nonAprilThemes, 3, out var resolved));
         Assert.AreEqual(ColorTheme.TianyiBlue, resolved);
         Assert.AreEqual(3, PageSetupUIViewModel.FindThemeIndex(nonAprilThemes, ColorTheme.TianyiBlue));
-        Assert.AreEqual(1, PageSetupUIViewModel.FindThemeIndex(nonAprilThemes, ColorTheme.HmclBlue));
-        Assert.IsFalse(PageSetupUIViewModel.TryResolveThemeByIndex(nonAprilThemes, 4, out _));
+        Assert.AreEqual(3, PageSetupUIViewModel.FindThemeIndex(nonAprilThemes, ColorTheme.HmclBlue));
+        Assert.IsFalse(PageSetupUIViewModel.TryResolveThemeByIndex(nonAprilThemes, 4, out var fallbackTheme));
+        Assert.AreEqual(ColorTheme.TianyiBlue, fallbackTheme);
+
+        var configCs = ReadRequiredFile(FindRepoRoot(), "PCL.Core", "App", "Config.cs");
+        Assert.IsTrue(
+            configCs.Contains("[ConfigItem<ColorTheme>(\"UiDarkColor\", ColorTheme.TianyiBlue)]", StringComparison.Ordinal),
+            "深色模式默认配色应为 ColorTheme.TianyiBlue");
+        Assert.IsTrue(
+            configCs.Contains("[ConfigItem<ColorTheme>(\"UiLightColor\", ColorTheme.TianyiBlue)]", StringComparison.Ordinal),
+            "浅色模式默认配色应为 ColorTheme.TianyiBlue");
 
         var aprilThemes = PageSetupUIViewModel.GetAvailableThemes(isAprilFool: true);
         Assert.IsTrue(PageSetupUIViewModel.TryResolveThemeByIndex(aprilThemes, 3, out var aprilTianyi));

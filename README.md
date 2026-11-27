@@ -10,7 +10,7 @@
 - **跨平台底座**：基于 .NET 10 / C# 15 / Avalonia 12，支持 macOS（ARM64 / x64）、Windows 与 Linux；Java 自动发现覆盖 PATH、`JAVA_HOME` 与 macOS 系统/用户级 `JavaVirtualMachines` 目录
 - **合规底座与隔离**：
   - 严格保留双许可架构与原作者首位署名、赞助链及启动劝导（`McLaunchPrecheck`）
-  - Windows 主色相锁定 PCL 蓝色系（含天空蓝、龙猫蓝、死机蓝、天依蓝 #66CCFF 等蓝系主题），禁用上游 Sentry 与联机遥测上报
+  - Windows 主色相锁定 PCL 蓝色系（含天空蓝、龙猫蓝、死机蓝、天依蓝 `#66CCFF` 等蓝系主题，浅色与深色默认均为天依蓝 `#66CCFF`），禁用上游 Sentry 与联机遥测上报
   - 应用数据目录独立隔离为 `PCL-DreamPort`，不影响原有 PCL CE 数据
 - **仅正版游戏账号**：屏蔽离线登录与外置登录入口，保留微软正版登录并内置设备码扫描二维码
 - **DreamPort 品牌与独立排障入口**：窗口标题栏、应用图标与关于页使用 DreamPort 官网标识，游戏启动自定义信息默认 `PCL-DreamPort`；AI 日志排障独立为「工具 → AI 排障」页面

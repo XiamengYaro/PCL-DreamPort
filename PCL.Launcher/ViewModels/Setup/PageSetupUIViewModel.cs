@@ -94,7 +94,7 @@ public partial class PageSetupUIViewModel : ViewModelBase
 
         for (var i = 0; i < themes.Count; i++)
         {
-            if (themes[i] == ColorTheme.CatBlue) return i;
+            if (themes[i] == ColorTheme.TianyiBlue) return i;
         }
 
         return 0;
@@ -111,7 +111,7 @@ public partial class PageSetupUIViewModel : ViewModelBase
             return true;
         }
 
-        theme = ColorTheme.CatBlue;
+        theme = ColorTheme.TianyiBlue;
         return false;
     }
 

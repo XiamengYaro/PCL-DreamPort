@@ -151,7 +151,7 @@ public sealed partial class ThemeService
         // for HMCL theme on April Fools' Day
         if (Basics.IsAprilFool)
             Config.Preference.WindowTitleTypeConfig.TriggerEvent(ConfigEvent.Changed, null);
-        else if (CurrentTheme == ColorTheme.HmclBlue) CurrentTheme = ColorTheme.CatBlue;
+        else if (CurrentTheme == ColorTheme.HmclBlue) CurrentTheme = ColorTheme.TianyiBlue;
     }
 
     /// <summary>刷新配色模式，若检测到当前配色模式有实际更改，则会触发主题刷新。</summary>
