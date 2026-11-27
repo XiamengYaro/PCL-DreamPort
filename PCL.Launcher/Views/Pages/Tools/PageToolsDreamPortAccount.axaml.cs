@@ -10,7 +10,7 @@ using PCL.Views.Pages.Launch;
 
 namespace PCL.Views.Pages.Tools;
 
-/// <summary>工具页中的 DreamPort 账号、多设备会话、六步入服引导与主页模式页面（原生 MyPageRight + MyCard 结构）。</summary>
+/// <summary>工具页中的 DreamPort 账号、多设备会话与六步入服引导页面（原生 MyPageRight + MyCard 结构）。</summary>
 public partial class PageToolsDreamPortAccount : MyPageRight
 {
     private bool _loadedOnce;

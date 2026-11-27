@@ -182,6 +182,98 @@ public sealed class DreamPortAccountPhase2ViewModelTests
         }
     }
 
+    [TestMethod]
+    public async Task ApprovedAccount_HidesConnectedBanner_OmitsSessionStorage_AndRemovesHomepageModeCard()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "dp-vm-approved-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var store = new DreamPortSessionStore(tempDir, new InMemoryVault());
+            store.Save("https://xmcraft.cn", "Alex", false, "tok-approved");
+
+            using var vm = new DreamPortAccountViewModel(
+                store: store,
+                clientFactory: url => new DreamPortApiClient(url, new StubHttpHandler((req, _) =>
+                {
+                    return req.RequestUri!.AbsolutePath switch
+                    {
+                        "/api/auth/validate" => Task.FromResult(JsonResponse(
+                            HttpStatusCode.OK,
+                            new { success = true, data = new { valid = true, username = "Alex", isAdmin = false } })),
+                        "/api/user/profile" => Task.FromResult(JsonResponse(
+                            HttpStatusCode.OK,
+                            new { success = true, data = new { username = "Alex", status = "approved", minecraftName = "AlexMC", points = 120 } })),
+                        "/api/user/progress" => Task.FromResult(JsonResponse(
+                            HttpStatusCode.OK,
+                            new
+                            {
+                                success = true,
+                                data = new
+                                {
+                                    currentStep = "complete",
+                                    doneCount = 6,
+                                    totalCount = 6,
+                                    gated = false,
+                                    showBar = false,
+                                    needsAccountVerification = false,
+                                    qqBindMode = "required",
+                                    rejected = false,
+                                    banned = false,
+                                    bindHint = false,
+                                    steps = Array.Empty<object>()
+                                }
+                            })),
+                        "/api/auth/sessions" => Task.FromResult(JsonResponse(HttpStatusCode.OK, new { success = true, data = Array.Empty<object>() })),
+                        "/api/points/center" => Task.FromResult(JsonResponse(HttpStatusCode.OK, new { success = true, data = new { balance = 120, signedToday = true, streak = 1, monthDays = 1, pendingClaimCount = 0 } })),
+                        "/api/titles/mine" => Task.FromResult(JsonResponse(HttpStatusCode.OK, new { success = true, data = new { equippedCode = "", owned = Array.Empty<object>() } })),
+                        "/api/notifications/unread-count" => Task.FromResult(JsonResponse(HttpStatusCode.OK, new { success = true, data = new { unread = 0 } })),
+                        _ => Task.FromResult(JsonResponse(HttpStatusCode.NotFound, new { success = false }))
+                    };
+                }), disposeHandler: true),
+                openUrl: _ => { });
+
+            await vm.InitializeAsync();
+            Assert.IsTrue(vm.IsLoggedIn);
+            Assert.IsTrue(vm.IsApprovedPlayer);
+            Assert.AreEqual(string.Empty, vm.StatusMessage);
+            Assert.IsFalse(vm.HasStatusMessage);
+            Assert.IsFalse(vm.AccountMetaSummary.Contains("会话存储", StringComparison.Ordinal));
+
+            var root = FindRepoRoot();
+            var axaml = File.ReadAllText(
+                Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Tools", "PageToolsDreamPortAccount.axaml"),
+                Encoding.UTF8);
+            Assert.IsTrue(axaml.Contains("IsVisible=\"{Binding HasStatusMessage}\"", StringComparison.Ordinal));
+            Assert.IsFalse(axaml.Contains("PCL 原生自定义主页来源", StringComparison.Ordinal));
+            Assert.IsFalse(axaml.Contains("站点推送优先", StringComparison.Ordinal));
+            Assert.IsFalse(axaml.Contains("应用并刷新主页", StringComparison.Ordinal));
+
+            var homepageContent = File.ReadAllText(
+                Path.Combine(root, "PCL.Launcher", "Views", "Pages", "Homepage", "HomepageContent.cs"),
+                Encoding.UTF8);
+            Assert.IsFalse(homepageContent.Contains("Config.Preference.Homepage.DreamPortMode", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "PCL Community Edition.slnx")))
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+
+        throw new DirectoryNotFoundException("未找到 PCL Community Edition.slnx 所在仓库根目录。");
+    }
+
     private static HttpResponseMessage JsonResponse(HttpStatusCode status, object body)
     {
         return new HttpResponseMessage(status)

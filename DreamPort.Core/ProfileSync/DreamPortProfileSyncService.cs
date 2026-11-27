@@ -184,7 +184,7 @@ public sealed class DreamPortProfileSyncService
                 DarkColor: PclConfig.Preference.Theme.DarkColor,
                 LightColor: PclConfig.Preference.Theme.LightColor,
                 WindowOpacity: PclConfig.Preference.Theme.WindowOpacity,
-                DreamPortHomepageMode: PclConfig.Preference.Homepage.DreamPortMode,
+                DreamPortHomepageMode: 0,
                 MusicVolume: PclConfig.Preference.Music.Volume,
                 MusicStopInGame: PclConfig.Preference.Music.StopInGame,
                 MusicStartInGame: PclConfig.Preference.Music.StartInGame,
@@ -255,7 +255,7 @@ public sealed class DreamPortProfileSyncService
         if (Enum.IsDefined(profile.Preference.LightColor))
             PclConfig.Preference.Theme.LightColor = profile.Preference.LightColor;
         PclConfig.Preference.Theme.WindowOpacity = Math.Clamp(profile.Preference.WindowOpacity, 0, 1000);
-        PclConfig.Preference.Homepage.DreamPortMode = Math.Clamp(profile.Preference.DreamPortHomepageMode, 0, 2);
+        PclConfig.Preference.Homepage.DreamPortMode = 0;
         PclConfig.Preference.Music.Volume = Math.Clamp(profile.Preference.MusicVolume, 0, 1000);
         PclConfig.Preference.Music.StopInGame = profile.Preference.MusicStopInGame;
         PclConfig.Preference.Music.StartInGame = profile.Preference.MusicStartInGame;

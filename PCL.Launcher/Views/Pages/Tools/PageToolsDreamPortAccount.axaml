@@ -11,6 +11,7 @@
         <StackPanel Margin="25,10">
             <ui:MyHint x:Name="HintStatus"
                        Margin="0,15,0,0"
+                       IsVisible="{Binding HasStatusMessage}"
                        Theme="Blue"
                        Text="{Binding StatusMessage}" />
 
@@ -90,7 +91,7 @@
                 </StackPanel>
             </ui:MyCard>
 
-            <ui:MyCard Margin="0,0,0,15"
+            <ui:MyCard Margin="0,15,0,15"
                        IsVisible="{Binding IsLoggedIn}"
                        Title="当前已登录账号">
                 <StackPanel Margin="25,40,25,20"
@@ -577,32 +578,6 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </StackPanel>
-            </ui:MyCard>
-
-            <ui:MyCard Margin="0,0,0,15"
-                       CanSwap="True"
-                       Title="PCL 原生自定义主页来源">
-                <StackPanel Margin="25,40,25,20"
-                            Spacing="10">
-                    <TextBlock TextWrapping="Wrap"
-                               Text="默认使用站点下发的主页。版本变化时重新下载，不可达或离线时使用内置主页。" />
-                    <Grid ColumnDefinitions="*,Auto"
-                          ColumnSpacing="14">
-                        <ui:MyComboBox Grid.Column="0"
-                                       HorizontalAlignment="Stretch"
-                                       SelectedIndex="{Binding HomepageModeIndex, Mode=TwoWay}">
-                            <ui:MyComboBoxItem Content="站点推送优先" />
-                            <ui:MyComboBoxItem Content="仅使用内置主页" />
-                            <ui:MyComboBoxItem Content="空白主页" />
-                        </ui:MyComboBox>
-                        <ui:MyButton Grid.Column="1"
-                                     MinWidth="130"
-                                     Height="35"
-                                     ColorType="Highlight"
-                                     Command="{Binding ApplyHomepageModeCommand}"
-                                     Text="应用并刷新主页" />
-                    </Grid>
                 </StackPanel>
             </ui:MyCard>
         </StackPanel>

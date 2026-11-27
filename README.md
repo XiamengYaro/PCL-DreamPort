@@ -42,7 +42,7 @@ PCL-梦港（`PCL-DreamPort`）是面向夏日小镇 · 梦港服务器的专用
 - **梦港账号、入服引导与社区集成**
   - **账号与多设备会话**：「工具 → 梦港账号」支持浏览器确认与同码手机扫码登录（`/api/qr-login/*`）、系统凭据库加密存储（DPAPI / Keychain）、严格区分会话过期（401）与网络波动，并支持活跃设备查看与单设备/批量踢出（`/api/auth/sessions*`）。
   - **原生六步入服引导**：对接 `/api/user/progress`，在启动器内原生完成 QQ 绑定/解绑（`/api/user/qq/*`）、使用当前已登录微软正版档案一键验证或设备码备用验证（`POST /api/user/minecraft/verify-token`）、邀请码入服（`POST /api/invite/apply`）、可交互入服问卷与 SSE 实时逐题 AI 评分反馈（`/api/questionnaire/{config,stream,submit}`），以及拒绝/封禁引导与人工复核申诉（`/api/questionnaire/appeal*`）。
-  - **积分、称号、公告与自定义主页**：启动时自动为已过审玩家每日静默签到一次并去重（`POST /api/points/signin`），支持查看积分/任务并佩戴或卸下称号（`/api/points/center`、`/api/titles/*`）；新增「工具 → 公告与通知」及标题栏右上角未读通知角标（`/api/announcements`、`/api/notifications*`）；首页接入服务端下发与缓存版本比对（`GET /api/client/pcl-homepage`），支持 Hero 背景、轮播图、照片墙与公告同步，离线时静默回退至本地 XAML 原型。
+  - **积分、称号、公告与自定义主页**：启动时自动为已过审玩家每日静默签到一次并去重（`POST /api/points/signin`），支持查看积分/任务并佩戴或卸下称号（`/api/points/center`、`/api/titles/*`）；新增「工具 → 公告与通知」及标题栏右上角未读通知角标（`/api/announcements`、`/api/notifications*`）；主页强制接入站点推送主页并与缓存版本比对（`GET /api/client/pcl-homepage`），支持 Hero 背景、轮播图、照片墙与公告同步，仅在离线或不可达时静默回退至本地内置 XAML 原型。
 - **梦港联机（TCP/TLS 中继）**
   - 完全移除 EasyTier 与 Natayark ID，原生实现仅基于 `DreamPort-Relay` 的 TCP/TLS 中继大厅与局域网广播发现：支持 `/realtime` WebSocket 秒级状态刷新（断连自动回退 30 秒轮询）、单人开房（`224.0.2.60:4445` 组播监听 + 游戏 `latest.log` 端口正则兜底与本机探活、SLP/本地模组扫描上报、10 秒 `host_status` 宽限保活、踢出/解禁、好友邀请与撤回、残留房间自救与退出自动关房），以及好友/公开大厅加房（兼容度排序、Forge/NeoForge 加载器与模组差异硬拦截、版本差异确认、多连接并发转发与局域网伪装广播）。
 - **同步工具与 AI 辅助**

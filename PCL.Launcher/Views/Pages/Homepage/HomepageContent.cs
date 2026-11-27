@@ -105,18 +105,6 @@ public static class HomepageSource
         Action? onNetworkDownload,
         Action<HomepageContent>? onBackgroundUpdated)
     {
-        var mode = Config.Preference.Homepage.DreamPortMode;
-        if (mode == 2)
-        {
-            return new HomepageContent
-            {
-                Kind = HomepageSourceKind.Blank
-            };
-        }
-
-        if (mode == 1)
-            return ResolveEmbeddedDreamPortPrototype();
-
         var session = new DreamPort.Core.Auth.DreamPortSessionStore().Load();
         var remoteUrl = DreamPort.Core.Homepage.DreamPortHomepageService.GetRemoteHomepageUrl(session.BaseUrl);
         var remote = ResolveRemote(
@@ -138,7 +126,7 @@ public static class HomepageSource
             return remote;
         }
 
-        // PoC/离线或后端暂未部署 /api/client/pcl-homepage 时静默回退内置原型，不打断启动
+        // 离线或站点 /api/client/pcl-homepage 暂不可达时静默回退内置原型，不打断启动
         return ResolveEmbeddedDreamPortPrototype();
     }
 

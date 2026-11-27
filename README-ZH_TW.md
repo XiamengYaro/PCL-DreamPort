@@ -42,7 +42,7 @@ PCL-夢港（`PCL-DreamPort`）是面向夏日小鎮 · 夢港伺服器的專用
 - **夢港帳號、入服引導與社群整合**
   - **帳號與多裝置工作階段**：「工具 → 夢港帳號」支援瀏覽器確認與同碼手機掃碼登入（`/api/qr-login/*`）、系統憑據庫加密儲存（DPAPI / Keychain）、嚴格區分工作階段過期（401）與網路波動，並支援查看活躍裝置與單一/批次踢除（`/api/auth/sessions*`）。
   - **原生六步入服引導**：串接 `/api/user/progress`，於啟動器內原生完成 QQ 綁定/解綁（`/api/user/qq/*`）、使用目前登入的微軟正版檔案一鍵驗證或裝置碼備援驗證（`POST /api/user/minecraft/verify-token`）、邀請碼入服（`POST /api/invite/apply`）、可互動入服問卷與 SSE 即時逐題 AI 評分回饋（`/api/questionnaire/{config,stream,submit}`），以及拒絕/封禁引導與人工複核申訴（`/api/questionnaire/appeal*`）。
-  - **積分、稱號、公告與自訂主頁**：啟動時自動為已過審玩家每日靜默簽到一次並去重（`POST /api/points/signin`），支援查看積分/任務並配戴或卸下稱號（`/api/points/center`、`/api/titles/*`）；新增「工具 → 公告與通知」及標題列右上角未讀通知角標（`/api/announcements`、`/api/notifications*`）；首頁接入伺服器端下發與快取版本比對（`GET /api/client/pcl-homepage`），支援 Hero 背景、輪播圖、照片牆與公告同步，離線時靜默回退至本機 XAML 原型。
+  - **積分、稱號、公告與自訂主頁**：啟動時自動為已過審玩家每日靜默簽到一次並去重（`POST /api/points/signin`），支援查看積分/任務並配戴或卸下稱號（`/api/points/center`、`/api/titles/*`）；新增「工具 → 公告與通知」及標題列右上角未讀通知角標（`/api/announcements`、`/api/notifications*`）；主頁強制串接站點推送主頁並與快取版本比對（`GET /api/client/pcl-homepage`），支援 Hero 背景、輪播圖、照片牆與公告同步，僅在離線或不可達時靜默回退至本機內建 XAML 原型。
 - **夢港連線（TCP/TLS 中繼）**
   - 完全移除 EasyTier 與 Natayark ID，原生實作僅基於 `DreamPort-Relay` 的 TCP/TLS 中繼大廳與區域網路廣播探索：支援 `/realtime` WebSocket 秒級狀態更新（斷線自動回退 30 秒輪詢）、單人開房（`224.0.2.60:4445` 群播監聽 + 遊戲 `latest.log` 埠號正規表示式備援與本機探活、SLP/本機模組掃描回報、10 秒 `host_status` 寬限保活、踢出/解禁、好友邀請與撤回、殘留房間自救與結束自動關房），以及好友/公開大廳加房（相容度排序、Forge/NeoForge 載入器與模組差異硬攔截、版本差異確認、多連線併發轉發與區域網路偽裝廣播）。
 - **同步工具與 AI 輔助**

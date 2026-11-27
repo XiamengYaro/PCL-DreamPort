@@ -14,7 +14,7 @@ using PCL.Core.App;
 namespace DreamPort.UI.ViewModels;
 
 /// <summary>
-/// DreamPort 账号登录（浏览器确认 + 同码二维码）、多设备会话管理、六步入服引导（QQ/MC验证/邀请/AI问卷/申诉）、每日签到积分称号与主页模式视图模型。
+/// DreamPort 账号登录（浏览器确认 + 同码二维码）、多设备会话管理、六步入服引导（QQ/MC验证/邀请/AI问卷/申诉）与每日签到积分称号视图模型。
 /// </summary>
 public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 {
@@ -41,12 +41,11 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _confirmUrl = string.Empty;
     [ObservableProperty] private Bitmap? _qrCodeBitmap;
     [ObservableProperty] private string _countdownText = string.Empty;
-    [ObservableProperty] private string _statusMessage = "未登录 DreamPort 站点账号。";
+    [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private bool _isStatusError;
     [ObservableProperty] private DreamPortHintLevel _hintLevel = DreamPortHintLevel.Info;
     [ObservableProperty] private string _loggedInUsername = string.Empty;
     [ObservableProperty] private string _accountMetaSummary = string.Empty;
-    [ObservableProperty] private int _homepageModeIndex;
 
     // ── 入服引导与六步进度 ──
     [ObservableProperty] private bool _showEntryFlowCard;
@@ -127,7 +126,6 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         _loggedInUsername = saved.Username ?? string.Empty;
         _isAdminAccount = saved.IsAdmin;
         _isLoggedIn = !string.IsNullOrEmpty(saved.Token);
-        _homepageModeIndex = Math.Clamp(SafeGetDreamPortHomepageMode(), 0, 2);
 
         _api = _clientFactory(_baseUrl);
         if (!string.IsNullOrEmpty(saved.Token))
@@ -139,6 +137,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
 
     public bool IsNotLoggedIn => !IsLoggedIn;
     public bool IsNotBusy => !IsBusy;
+    public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
     public bool IsNotStatusError => !IsStatusError;
     public bool CanBindQq => IsLoggedIn && IsQqAvailable && !IsQqBound && IsNotBusy;
     public bool CanUnbindQq => IsLoggedIn && IsQqBound && IsNotBusy;
@@ -173,6 +172,11 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanManualSignin));
         OnPropertyChanged(nameof(CanApplySelectedTitle));
         OnPropertyChanged(nameof(CanUnequipTitle));
+    }
+
+    partial void OnStatusMessageChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasStatusMessage));
     }
 
     partial void OnIsBusyChanged(bool value)
@@ -1046,23 +1050,6 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         }
     }
 
-    [RelayCommand]
-    private void ApplyHomepageMode()
-    {
-        var clamped = Math.Clamp(HomepageModeIndex, 0, 2);
-        HomepageModeIndex = clamped;
-        SafeSetDreamPortHomepageMode(clamped);
-        _onHomepagePreferenceChanged?.Invoke();
-
-        var label = clamped switch
-        {
-            0 => "远端优先并静默回退本地原型",
-            1 => "仅使用本地内置原型",
-            _ => "空白页"
-        };
-        SetStatus($"✓ 主页模式已切换为「{label}」，并已触发主页刷新。", DreamPortHintLevel.Info);
-    }
-
     public void Dispose()
     {
         CancelActiveLoginWait();
@@ -1159,7 +1146,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
             ResetRewardsAndTitlesState();
             DreamPortShellBridge.ResetUnreadCount();
             if (showSuccessBanner)
-                SetStatus("✓ 已连接 DreamPort，管理员身份。", DreamPortHintLevel.Info);
+                ClearStatus();
             return;
         }
 
@@ -1182,7 +1169,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         }
 
         await LoadSessionsCoreAsync(ct);
-        var autoSignedNow = await RefreshRewardsAndTitlesCoreAsync(
+        _ = await RefreshRewardsAndTitlesCoreAsync(
             allowAutoSignin: IsApprovedPlayer && string.Equals(profile?.Status, "approved", StringComparison.OrdinalIgnoreCase),
             profileStatus: profile?.Status,
             showErrorInStatus: false,
@@ -1196,10 +1183,8 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                 SetStatus("入服审核未通过，可在下方提交人工复核申诉或查看管理员回复。", DreamPortHintLevel.Warning);
             else if (ShowEntryFlowCard)
                 SetStatus("已登录 DreamPort 站点，请按下方入服引导完成待办步骤。", DreamPortHintLevel.Warning);
-            else if (autoSignedNow)
-                SetStatus("✓ 已连接 DreamPort 站点并完成每日自动签到。", DreamPortHintLevel.Info);
             else
-                SetStatus("✓ 已连接 DreamPort 站点并完成账号与会话校验。", DreamPortHintLevel.Info);
+                ClearStatus();
         }
     }
 
@@ -1517,7 +1502,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                         await RefreshAccountStateAsync(saved.IsAdmin, saved.IsTokenPersistent, showSuccessBanner: false, ct);
                         _onSessionOrSiteChanged?.Invoke();
 
-                        var suffix = saved.IsTokenPersistent ? "凭据已加密保存。" : "系统加密存储不可用，本次令牌仅保留在内存中。";
+                        var suffix = saved.IsTokenPersistent ? string.Empty : " 系统加密存储不可用，本次令牌仅保留在内存中。";
                         var flowHint = ShowEntryFlowCard ? " 请按下方引导完成入服步骤。" : "";
                         SetStatus($"✓ 授权登录成功，欢迎 {LoggedInUsername}！{suffix}{flowHint}", DreamPortHintLevel.Info);
                         return;
@@ -1602,8 +1587,7 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            var name = string.IsNullOrWhiteSpace(cfg.SiteName) ? _api.BaseUrl : cfg.SiteName;
-            SetStatus($"✓ 已连通站点：{name}", DreamPortHintLevel.Info);
+            ClearStatus();
         }
         finally
         {
@@ -1921,7 +1905,6 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         var sb = new StringBuilder();
         sb.Append($"服务地址：{_api.BaseUrl}");
         sb.Append($" | 身份：{(isAdmin ? "管理员" : "普通玩家")}");
-        sb.Append($" | 会话存储：{(isTokenPersistent ? "系统安全加密持久化" : "仅当前进程内存")}");
 
         if (profile is not null)
         {
@@ -1957,28 +1940,10 @@ public partial class DreamPortAccountViewModel : ObservableObject, IDisposable
         IsStatusError = level == DreamPortHintLevel.Error;
     }
 
-    private static int SafeGetDreamPortHomepageMode()
+    private void ClearStatus()
     {
-        try
-        {
-            return Config.Preference.Homepage.DreamPortMode;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
-    private static void SafeSetDreamPortHomepageMode(int mode)
-    {
-        try
-        {
-            Config.Preference.Homepage.Type = 0;
-            Config.Preference.Homepage.DreamPortMode = mode;
-        }
-        catch
-        {
-            // 测试宿主未初始化 Config 时忽略落盘
-        }
+        StatusMessage = string.Empty;
+        HintLevel = DreamPortHintLevel.Info;
+        IsStatusError = false;
     }
 }
