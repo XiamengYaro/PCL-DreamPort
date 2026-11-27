@@ -52,7 +52,7 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
 
         _logoTypeRadios = [RadioLogoType0, RadioLogoType1, RadioLogoType2, RadioLogoType3];
         _homepageRadios = [RadioCustomType0, RadioCustomType3, RadioCustomType1, RadioCustomType2];
-        _macTitleBarStyleRadios = [RadioMacTitleBarStyle0, RadioMacTitleBarStyle1];
+        _macTitleBarStyleRadios = [RadioMacTitleBarStyle0, RadioMacTitleBarStyle1, RadioMacTitleBarStyle2];
 
         SliderLauncherOpacity.getHintText =
             new Func<object, object>(PageSetupUIViewModel.FormatLauncherOpacityHint);
@@ -242,7 +242,8 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         try
         {
             ViewModel.Reload(PageSetupUIViewModel.GetAvailableThemes(Basics.IsAprilFool));
-            _macTitleBarStyleRadios[Math.Clamp(Config.Preference.MacTitleBarStyle, 0, 1)].SetChecked(true, false);
+            _macTitleBarStyleRadios[(int)PageSetupUIViewModel.ResolveMacTitleBarStyle(Config.Preference.MacTitleBarStyle)]
+                .SetChecked(true, false);
             CheckLockWindowSize.Checked = Config.Preference.LockWindowSize;
             CheckShowLaunchingHint.Checked = Config.Preference.ShowLaunchingHint;
 
@@ -334,8 +335,9 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
 
     private static bool _IsLogoTypeLocked()
     {
-        return ApplicationRuntime.Current.Platform.Capabilities.SupportsTitleBarStyleSelection
-            && Config.Preference.MacTitleBarStyle >= 1;
+        return PageSetupUIViewModel.IsLogoTypeLockedForMacTitleBar(
+            ApplicationRuntime.Current.Platform.Capabilities.SupportsTitleBarStyleSelection,
+            Config.Preference.MacTitleBarStyle);
     }
 
     private void _RefreshLogoTypeLock()

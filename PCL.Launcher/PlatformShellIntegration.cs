@@ -96,23 +96,44 @@ internal sealed class MacOsShellIntegration : IPlatformShellIntegration
 
     private static void _ApplyTitleBarStyle(MainWindow window)
     {
-        var unified = Config.Preference.MacTitleBarStyle >= 1;
+        var style = PageSetupUIViewModel.ResolveMacTitleBarStyle(Config.Preference.MacTitleBarStyle);
         var height = window.Height;
-        window.ExtendClientAreaToDecorationsHint = unified;
-        if (unified)
-        {
-            _AttachUnifiedToolbar(window);
-            // 先设为 0 再设回 -1，是为了让 Avalonia 重新读取系统标题栏的高度
-            window.ExtendClientAreaTitleBarHeightHint = 0d;
-            window.ExtendClientAreaTitleBarHeightHint = -1d;
-        }
-        else
-        {
-            _ResetTitleBarStyles(window);
-        }
 
-        window.Height = height;
-        window.ApplyExtendedTitleBarLayout(unified ? UnifiedTitleBarLeadingInset : 0d);
+        switch (style)
+        {
+            case MacTitleBarStyle.Unified:
+                window.WindowDecorations = WindowDecorations.Full;
+                window.ExtendClientAreaToDecorationsHint = true;
+                _AttachUnifiedToolbar(window);
+                // 先设为 0 再设回 -1，是为了让 Avalonia 重新读取系统标题栏的高度
+                window.ExtendClientAreaTitleBarHeightHint = 0d;
+                window.ExtendClientAreaTitleBarHeightHint = -1d;
+                window.SetUseSystemCaptionButtons(true);
+                window.Height = height;
+                window.ApplyExtendedTitleBarLayout(UnifiedTitleBarLeadingInset);
+                break;
+
+            case MacTitleBarStyle.Separate:
+                window.ExtendClientAreaToDecorationsHint = false;
+                _ResetTitleBarStyles(window, hideSeparator: false);
+                window.WindowDecorations = WindowDecorations.Full;
+                window.SetUseSystemCaptionButtons(true);
+                window.Height = height;
+                window.ApplyExtendedTitleBarLayout(0d);
+                break;
+
+            case MacTitleBarStyle.Custom:
+            default:
+                // 必须先关闭 ExtendClientAreaToDecorationsHint，避免 SetExtendClientArea(false) 把标题可见性写回可见
+                if (window.ExtendClientAreaToDecorationsHint)
+                    window.ExtendClientAreaToDecorationsHint = false;
+                _ResetTitleBarStyles(window, hideSeparator: true);
+                window.WindowDecorations = WindowDecorations.BorderOnly;
+                window.SetUseSystemCaptionButtons(false);
+                window.Height = height;
+                window.ApplyExtendedTitleBarLayout(0d);
+                break;
+        }
     }
 
     private static void _AttachUnifiedToolbar(Window window)
@@ -140,14 +161,17 @@ internal sealed class MacOsShellIntegration : IPlatformShellIntegration
         nsWindow.SendMessage(_SetTitlebarSeparatorStyle, NoTitlebarSeparator);
     }
 
-    private static void _ResetTitleBarStyles(Window window)
+    private static void _ResetTitleBarStyles(Window window, bool hideSeparator = false)
     {
         if (window.TryGetPlatformHandle()?.Handle is not { } handle || handle == 0) return;
         EnsureFrameworks();
 
         var nsWindow = new ObjCObject(handle);
+        nsWindow.SendMessage(_SetToolbar, default(ObjCObject));
         nsWindow.SendMessage(_SetToolbarStyle, AutomaticToolbarStyle);
-        nsWindow.SendMessage(_SetTitlebarSeparatorStyle, AutomaticTitlebarSeparator);
+        nsWindow.SendMessage(
+            _SetTitlebarSeparatorStyle,
+            hideSeparator ? NoTitlebarSeparator : AutomaticTitlebarSeparator);
     }
 
     private static void _AttachMenus(Window window)

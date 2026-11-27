@@ -107,3 +107,13 @@ public enum LauncherTitleType
     Text = 2,
     Image = 3
 }
+
+/// <summary>
+/// macOS 窗口标题栏样式
+/// </summary>
+public enum MacTitleBarStyle
+{
+    Separate = 0,
+    Unified = 1,
+    Custom = 2
+}

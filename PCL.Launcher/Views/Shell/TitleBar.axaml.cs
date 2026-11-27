@@ -177,12 +177,15 @@ public partial class TitleBar : UserControl
         return _isExtended ? (int)LauncherTitleType.None : (int)Config.Preference.WindowTitleType;
     }
 
-    /// <summary>当窗口使用系统标题栏按钮（macOS 红绿灯）时，隐藏自绘的最小化与关闭按钮。</summary>
-    public void UseSystemCaptionButtons()
+    /// <summary>切换是否使用系统标题栏按钮（macOS 红绿灯）；使用系统按钮时隐藏自绘最小化与关闭按钮，反之显示。</summary>
+    public void SetUseSystemCaptionButtons(bool useSystem)
     {
-        BtnTitleMin.IsVisible = false;
-        BtnTitleClose.IsVisible = false;
+        BtnTitleMin.IsVisible = !useSystem;
+        BtnTitleClose.IsVisible = !useSystem;
     }
+
+    /// <summary>当窗口使用系统标题栏按钮（macOS 红绿灯）时，隐藏自绘的最小化与关闭按钮。</summary>
+    public void UseSystemCaptionButtons() => SetUseSystemCaptionButtons(true);
 
     public void SetSystemTitleBarLayout(double? height, double leadingInset)
     {

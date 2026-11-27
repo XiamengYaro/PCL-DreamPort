@@ -153,9 +153,9 @@ public static partial class Config
         [ConfigItem<LauncherTitleType>("UiLogoType", LauncherTitleType.Default, ConfigSource.Local)] public partial LauncherTitleType WindowTitleType { get; set; }
 
         /// <summary>
-        /// macOS 标题栏样式。
+        /// macOS 标题栏样式（0 = 独立标题栏，1 = 融入标题栏，2 = 自绘标题栏）。
         /// </summary>
-        [ConfigItem<int>("UiMacTitleBarStyle", 0, ConfigSource.Local)] public partial int MacTitleBarStyle { get; set; }
+        [ConfigItem<int>("UiMacTitleBarStyle", 2, ConfigSource.Local)] public partial int MacTitleBarStyle { get; set; }
 
         /// <summary>
         /// 窗口标题文本。

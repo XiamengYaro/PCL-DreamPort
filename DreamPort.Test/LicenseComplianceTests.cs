@@ -359,6 +359,40 @@ public sealed class LicenseComplianceTests
         }
     }
 
+    [TestMethod]
+    public void MacTitleBarStyle_DefaultsToCustomAndOnlyUnifiedLocksLogo()
+    {
+        Assert.AreEqual(MacTitleBarStyle.Separate, PageSetupUIViewModel.ResolveMacTitleBarStyle(0));
+        Assert.AreEqual(MacTitleBarStyle.Unified, PageSetupUIViewModel.ResolveMacTitleBarStyle(1));
+        Assert.AreEqual(MacTitleBarStyle.Custom, PageSetupUIViewModel.ResolveMacTitleBarStyle(2));
+        Assert.AreEqual(MacTitleBarStyle.Custom, PageSetupUIViewModel.ResolveMacTitleBarStyle(-1));
+        Assert.AreEqual(MacTitleBarStyle.Custom, PageSetupUIViewModel.ResolveMacTitleBarStyle(99));
+
+        Assert.IsTrue(PageSetupUIViewModel.IsLogoTypeLockedForMacTitleBar(true, 1));
+        Assert.IsFalse(PageSetupUIViewModel.IsLogoTypeLockedForMacTitleBar(true, 0));
+        Assert.IsFalse(PageSetupUIViewModel.IsLogoTypeLockedForMacTitleBar(true, 2));
+        Assert.IsFalse(PageSetupUIViewModel.IsLogoTypeLockedForMacTitleBar(false, 1));
+
+        var root = FindRepoRoot();
+        var configSource = ReadRequiredFile(root, "PCL.Core", "App", "Config.cs");
+        Assert.IsTrue(
+            configSource.Contains(
+                "[ConfigItem<int>(\"UiMacTitleBarStyle\", 2, ConfigSource.Local)]",
+                StringComparison.Ordinal),
+            "UiMacTitleBarStyle 默认值应为 2（自绘标题栏）。");
+
+        foreach (var languageFile in new[] { "zh-CN.axaml", "zh-TW.axaml", "en-US.axaml", "en-GB.axaml" })
+        {
+            var content = ReadRequiredFile(root, "PCL.Localization", "Languages", languageFile);
+            Assert.IsTrue(
+                content.Contains("x:Key=\"Setup.Ui.Logo.MacTitleBarStyle.Custom\"", StringComparison.Ordinal),
+                $"{languageFile} 缺少 Setup.Ui.Logo.MacTitleBarStyle.Custom 本地化键值。");
+            Assert.IsFalse(
+                ContainsColorEmoji(content, out var offense),
+                $"{languageFile} 不得包含彩色 emoji：{offense}");
+        }
+    }
+
     internal static bool ContainsColorEmoji(string text, out string offense)
     {
         foreach (var rune in text.EnumerateRunes())

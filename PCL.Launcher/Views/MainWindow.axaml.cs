@@ -207,11 +207,10 @@ public partial class MainWindow : Window
         LauncherCommon.Dpi = (int)Math.Round(RenderScaling * 96d);
     }
 
-    // macOS 改用系统标题栏，把圆角，阴影等交给系统处理，PCL因为窗口本身不支持最大化，因此绿灯保持禁用
+    // macOS 交由系统处理窗口圆角、阴影与原生缩放，标题栏样式与窗口按钮由 PlatformShellIntegration 控制；PCL 窗口不支持最大化，因此绿灯保持禁用
     public void UseSystemWindowChrome()
     {
         _useSystemWindowChrome = true;
-        WindowDecorations = WindowDecorations.Full;
         CanMaximize = false;
 
         ShadowHost.ShadowRadius = 0d;
@@ -222,11 +221,15 @@ public partial class MainWindow : Window
         PanBack.Clip = null;
         Cursor = null;
 
-        _titleBar.UseSystemCaptionButtons();
         PropertyChanged += (_, e) =>
         {
             if (e.Property == WindowDecorationMarginProperty) ApplyExtendedTitleBarLayout(_titleBarLeadingInset);
         };
+    }
+
+    public void SetUseSystemCaptionButtons(bool useSystem)
+    {
+        _titleBar.SetUseSystemCaptionButtons(useSystem);
     }
 
     public void ApplyExtendedTitleBarLayout(double leadingInset)

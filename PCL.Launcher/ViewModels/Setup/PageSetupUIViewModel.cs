@@ -115,6 +115,16 @@ public partial class PageSetupUIViewModel : ViewModelBase
         return false;
     }
 
+    public static MacTitleBarStyle ResolveMacTitleBarStyle(int rawValue) => rawValue switch
+    {
+        (int)MacTitleBarStyle.Separate => MacTitleBarStyle.Separate,
+        (int)MacTitleBarStyle.Unified => MacTitleBarStyle.Unified,
+        _ => MacTitleBarStyle.Custom
+    };
+
+    public static bool IsLogoTypeLockedForMacTitleBar(bool supportsTitleBarStyleSelection, int rawStyle) =>
+        supportsTitleBarStyleSelection && ResolveMacTitleBarStyle(rawStyle) == MacTitleBarStyle.Unified;
+
     partial void OnDarkModeSelectedIndexChanged(int value)
     {
         if (!_reloading && value >= 0)
