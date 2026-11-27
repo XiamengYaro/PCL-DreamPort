@@ -92,7 +92,7 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
             LauncherCommon.ModeDebugChanged -= OnModeDebugChanged;
             LauncherCommon.ModeDebugChanged += OnModeDebugChanged;
             OnModeDebugChanged(LauncherCommon.ModeDebug);
-            _panBack.ScrollToHome();
+            ResetScrollToTop();
             EnsureHomepageLiveWatcher();
             // 首次进入不主动清缓存：有缓存时先显示缓存并在后台检查新版本。
             RefreshContent();
@@ -138,6 +138,7 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
 
     public override void OnNavigatedTo(PageParameter? parameter)
     {
+        ResetScrollToTop();
     }
 
     public override void OnNavigatedFrom()
@@ -148,8 +149,14 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
     {
         LogWrapper.Info("Launch", "[Page] 要求强制刷新主页");
         HomepageSource.ClearCache();
-        _panBack.ScrollToHome();
+        ResetScrollToTop();
         RefreshContent();
+    }
+
+    private void ResetScrollToTop()
+    {
+        _panBack.ResetToTop();
+        Dispatcher.UIThread.Post(_panBack.ResetToTop, DispatcherPriority.Loaded);
     }
 
     private void RefreshContent()
@@ -205,7 +212,7 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
                     }
 
                     LoadContent(content);
-                    _panBack.ScrollToHome();
+                    ResetScrollToTop();
                 }
                 finally
                 {
@@ -267,7 +274,10 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
             return;
         }
 
+        var wasAtTop = _panBack.Offset.Y <= 1d;
         LoadContent(content);
+        if (wasAtTop)
+            ResetScrollToTop();
     }
 
     private void LoadContent(HomepageContent content)

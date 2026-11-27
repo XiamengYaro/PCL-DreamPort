@@ -293,6 +293,40 @@ public static class PageRouter
         }
     }
 
+    /// <summary>程序主动聚焦目标控件，同时抑制祖先滚动容器因获得焦点而把视口自动滚动到页面中部。</summary>
+    public static void FocusControlWithoutScrolling(Control target)
+    {
+        var scrollAncestors = target.GetVisualAncestors().OfType<ScrollViewer>().ToList();
+        var previousAncestorFlags = new List<(ScrollViewer Viewer, bool Previous)>(scrollAncestors.Count);
+        var myScrollAncestors = new List<MyScrollViewer>();
+
+        foreach (var viewer in scrollAncestors)
+        {
+            previousAncestorFlags.Add((viewer, viewer.BringIntoViewOnFocusChange));
+            viewer.BringIntoViewOnFocusChange = false;
+            if (viewer is MyScrollViewer myScroll)
+            {
+                myScrollAncestors.Add(myScroll);
+                myScroll.BeginSuppressBringIntoView();
+            }
+        }
+
+        var previousTargetFlag = ScrollViewer.GetBringIntoViewOnFocusChange(target);
+        ScrollViewer.SetBringIntoViewOnFocusChange(target, false);
+        try
+        {
+            target.Focus();
+        }
+        finally
+        {
+            ScrollViewer.SetBringIntoViewOnFocusChange(target, previousTargetFlag);
+            foreach (var (viewer, previous) in previousAncestorFlags)
+                viewer.BringIntoViewOnFocusChange = previous;
+            foreach (var myScroll in myScrollAncestors)
+                myScroll.EndSuppressBringIntoView();
+        }
+    }
+
     private static void FocusFirst(Control page)
     {
         Dispatcher.UIThread.Post(
@@ -320,9 +354,9 @@ public static class PageRouter
                             || (control is not MyListItem && control is not MyIconButton)));
 
                 if (target is not null)
-                    target.Focus();
+                    FocusControlWithoutScrolling(target);
                 else if (page.Focusable)
-                    page.Focus();
+                    FocusControlWithoutScrolling(page);
             },
             DispatcherPriority.Loaded);
     }

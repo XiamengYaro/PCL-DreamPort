@@ -24,6 +24,7 @@ public class MyScrollViewer : ScrollViewer
     private double _realOffset;
     private WindowBase? _window;
     private bool _isRestoringFocus;
+    private int _suppressBringIntoViewCount;
     private MyScrollBar? _verticalScrollBar;
     private MyScrollBar? _horizontalScrollBar;
 
@@ -59,16 +60,36 @@ public class MyScrollViewer : ScrollViewer
 
     private double MaximumOffset => Math.Max(0d, Extent.Height - Viewport.Height);
 
+    public bool IsSuppressingBringIntoView => _isRestoringFocus || _suppressBringIntoViewCount > 0;
+
+    public void BeginSuppressBringIntoView()
+    {
+        _suppressBringIntoViewCount++;
+    }
+
+    public void EndSuppressBringIntoView()
+    {
+        _suppressBringIntoViewCount = Math.Max(0, _suppressBringIntoViewCount - 1);
+    }
+
+    /// <summary>立即把滚动偏移复位到顶部。</summary>
+    public void ResetToTop()
+    {
+        _realOffset = 0d;
+        Offset = new Vector(Offset.X, 0d);
+        ScrollToHome();
+    }
+
     /// <summary>
     ///     焦点控件通过 <see cref="ScrollViewer.BringIntoViewOnFocusChange" /> 附加属性关闭了自动滚动时
-    ///     （例如 <see cref="MySlider" />），不把该控件滚入视野；其余控件保持滚入视野的默认行为。
+    ///     （例如 <see cref="MySlider" />），或正处于禁止滚入视野的作用域时，不把该控件滚入视野；其余控件保持滚入视野的默认行为。
     /// </summary>
     protected override void OnGotFocus(FocusChangedEventArgs e)
     {
         if (e.Source is Control source && !GetBringIntoViewOnFocusChange(source))
             return;
 
-        if (_isRestoringFocus)
+        if (IsSuppressingBringIntoView)
             return;
 
         base.OnGotFocus(e);

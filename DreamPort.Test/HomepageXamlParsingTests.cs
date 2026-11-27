@@ -4,6 +4,7 @@ using Avalonia.VisualTree;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using PCL.Navigation;
 using PCL.UI.Controls;
 using PCL.UI.Xaml;
 
@@ -92,6 +93,46 @@ public sealed class HomepageXamlParsingTests
         var image = tile.Children.OfType<MyImage>().Single();
         Assert.AreEqual("https://xmcraft.cn/uploads/photo.webp", image.Source);
         Assert.AreEqual(new CornerRadius(6), image.CornerRadius);
+    }
+
+    [TestMethod]
+    public void PageRouterFocusAndLaunchRightScroll_SuppressInitialBringIntoViewAndResetToTop()
+    {
+        var scrollViewer = new MyScrollViewer();
+        Assert.IsFalse(scrollViewer.IsSuppressingBringIntoView);
+        scrollViewer.BeginSuppressBringIntoView();
+        scrollViewer.BeginSuppressBringIntoView();
+        Assert.IsTrue(scrollViewer.IsSuppressingBringIntoView);
+        scrollViewer.EndSuppressBringIntoView();
+        Assert.IsTrue(scrollViewer.IsSuppressingBringIntoView, "嵌套抑制退出一层时应继续保持抑制");
+        scrollViewer.EndSuppressBringIntoView();
+        Assert.IsFalse(scrollViewer.IsSuppressingBringIntoView);
+        scrollViewer.EndSuppressBringIntoView();
+        Assert.IsFalse(scrollViewer.IsSuppressingBringIntoView);
+        scrollViewer.ResetToTop();
+        Assert.AreEqual(0d, scrollViewer.Offset.Y);
+
+        var button = new MyButton { Text = "测试按钮" };
+        scrollViewer.Content = button;
+        PageRouter.FocusControlWithoutScrolling(button);
+        Assert.IsTrue(ScrollViewer.GetBringIntoViewOnFocusChange(button), "聚焦完成后应恢复控件原有 BringIntoViewOnFocusChange");
+        Assert.IsFalse(scrollViewer.IsSuppressingBringIntoView);
+
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "PCL Community Edition.slnx")))
+            dir = dir.Parent;
+        Assert.IsNotNull(dir);
+
+        var pageRouterCs = File.ReadAllText(Path.Combine(dir.FullName, "PCL.Launcher", "Navigation", "PageRouter.cs"));
+        Assert.IsTrue(pageRouterCs.Contains("FocusControlWithoutScrolling(target)", StringComparison.Ordinal));
+        Assert.IsTrue(pageRouterCs.Contains("BeginSuppressBringIntoView", StringComparison.Ordinal));
+
+        var scrollViewerCs = File.ReadAllText(Path.Combine(dir.FullName, "PCL.Launcher", "UI", "Controls", "Containers", "MyScrollViewer.cs"));
+        Assert.IsTrue(scrollViewerCs.Contains("IsSuppressingBringIntoView", StringComparison.Ordinal));
+
+        var launchRightCs = File.ReadAllText(Path.Combine(dir.FullName, "PCL.Launcher", "Views", "Pages", "Launch", "PageLaunchRight.axaml.cs"));
+        Assert.IsTrue(launchRightCs.Contains("ResetScrollToTop()", StringComparison.Ordinal));
+        Assert.IsTrue(launchRightCs.Contains("wasAtTop", StringComparison.Ordinal));
     }
 
     private static IEnumerable<T> FindControls<T>(Control root)
