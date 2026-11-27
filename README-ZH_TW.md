@@ -129,6 +129,10 @@ Windows 發佈物為單檔案 `PCL.Launcher.exe`，發佈流程會將其重新�
 | `DP_UPDATE_MIRROR_URL` | `https://dl.xmcraft.cn` | 更新等配套服務下載加速源（不用於遊戲資料下載） |
 | `PCL_MS_CLIENT_ID` | （必填） | 自有 Azure 正版登入 Client ID（建置期注入；Debug 支援 `DP_MS_CLIENT_ID`） |
 
+## AI 輔助開發聲明
+
+本倉庫的二次開發、測試編寫與文件整理過程中使用了 **Antigravity** 輔助開發工具，所用模型為 **Gemini Neon / Hydrogen**，相關變更均通過本機建置與單元測試驗證。
+
 ## 授權條款
 
 - `PCL.Launcher/` 和 `PCL.Launcher.Core/` 目錄嚴格適用並延續 [PCL 自訂分發有限授權及合理使用指南](PCL.Launcher.Core/LICENCE)

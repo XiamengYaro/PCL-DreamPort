@@ -129,6 +129,10 @@ Windows produces a single-file `PCL.Launcher.exe`, which release workflows renam
 | `DP_UPDATE_MIRROR_URL` | `https://dl.xmcraft.cn` | Companion/update mirror URL (not used for game data downloads) |
 | `PCL_MS_CLIENT_ID` | (Required) | Azure Client ID for Microsoft login (build-time; `DP_MS_CLIENT_ID` in Debug) |
 
+## AI Assistance Disclosure
+
+This repository utilizes **Antigravity** powered by **Gemini Neon / Hydrogen** models to assist with derivative feature implementation, test authoring, and documentation maintenance, with changes verified through local builds and unit tests.
+
 ## License
 
 - `PCL.Launcher/` and `PCL.Launcher.Core/` strictly follow the [PCL Custom Limited Distribution License & Fair Use Guide](PCL.Launcher.Core/LICENCE)

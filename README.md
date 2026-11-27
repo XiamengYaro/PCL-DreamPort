@@ -129,6 +129,10 @@ Windows 发布物为单文件 `PCL.Launcher.exe`，发布流程会将其重命�
 | `DP_UPDATE_MIRROR_URL` | `https://dl.xmcraft.cn` | 更新等配套服务下载加速源（不用于游戏数据下载） |
 | `PCL_MS_CLIENT_ID` | （必填） | 自有 Azure 正版登录 Client ID（构建期注入；Debug 支持 `DP_MS_CLIENT_ID`） |
 
+## AI 辅助开发声明
+
+本仓库的二次开发、测试编写与文档整理过程中使用了 **Antigravity** 辅助开发工具，所用模型为 **Gemini Neon / Hydrogen**，相关变更均通过本地构建与单元测试验证。
+
 ## 许可证
 
 - `PCL.Launcher/` 和 `PCL.Launcher.Core/` 目录严格适用并延续 [PCL 自定义分发有限许可及合理使用指南](PCL.Launcher.Core/LICENCE)
