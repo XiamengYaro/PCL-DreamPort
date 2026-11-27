@@ -115,7 +115,7 @@ dotnet test DreamPort.Test/DreamPort.Test.csproj -c Debug
 dotnet test PCL.Core.Test/PCL.Core.Test.csproj -c Debug
 
 # 打包與跨平台輕量發佈（--no-self-contained，CI 發佈工作流程會自動產生 SHA256SUMS 供自動更新器校驗）
-PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.9 dist
+PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.10 dist
 bash scripts/publish-windows.sh win-x64 Release dist
 bash scripts/publish.sh linux-x64 Release dist
 ```

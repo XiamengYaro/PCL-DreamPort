@@ -115,7 +115,7 @@ dotnet test DreamPort.Test/DreamPort.Test.csproj -c Debug
 dotnet test PCL.Core.Test/PCL.Core.Test.csproj -c Debug
 
 # Cross-platform lightweight packaging (--no-self-contained; CI generates SHA256SUMS for auto-updates)
-PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.9 dist
+PCL_SKIP_CODESIGN=1 bash scripts/package-macos.sh osx-arm64 Release 0.1.10 dist
 bash scripts/publish-windows.sh win-x64 Release dist
 bash scripts/publish.sh linux-x64 Release dist
 ```
